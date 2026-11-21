@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CZ Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=JetBrains+Mono:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+/* CZ//STUDIO – hacker / cyberpunk editing deck
+   ground: deep blue-black · ink: cool white · action: neon cyan · accent: hot magenta · warn: amber · err: red */
+:root{
+  --bg:#05070d;--panel:#0a0f1a;--panel2:#0e1524;--line:#16233a;--line2:#22385c;
+  --ink:#d9f3ff;--soft:#7f9bb8;--dim:#4a6380;
+  --cy:#00f0ff;--cy-soft:rgba(0,240,255,.12);--mg:#ff2bd6;--mg-soft:rgba(255,43,214,.14);
+  --amb:#ffb020;--err:#ff3b5c;--ok:#39ff9c;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;--disp:"Chakra Petch","JetBrains Mono",sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box;min-width:0}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--ink);font:14px/1.55 var(--mono);overflow-x:hidden}
+body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:50;
+  background:repeating-linear-gradient(0deg,rgba(0,240,255,.025) 0 1px,transparent 1px 3px)}
+body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:-1;
+  background:radial-gradient(900px 500px at 85% -10%,rgba(255,43,214,.10),transparent 60%),
+             radial-gradient(800px 600px at -10% 110%,rgba(0,240,255,.08),transparent 60%),
+             linear-gradient(rgba(34,56,92,.25) 1px,transparent 1px) 0 0/40px 40px,
+             linear-gradient(90deg,rgba(34,56,92,.25) 1px,transparent 1px) 0 0/40px 40px}
+::selection{background:var(--mg);color:#000}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--cy);outline-offset:2px}
+
+/* top bar */
+.bar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:18px;height:56px;padding:0 20px;
+  background:rgba(5,7,13,.9);backdrop-filter:blur(8px);border-bottom:1px solid var(--line2)}
+.logo{font:700 22px var(--disp);letter-spacing:.06em;position:relative;white-space:nowrap}
+.logo b{color:var(--cy);text-shadow:0 0 12px rgba(0,240,255,.7)}
+.logo span{color:var(--mg)}
+.logo::after{content:attr(data-t);position:absolute;left:2px;top:0;color:var(--mg);opacity:.0;clip-path:inset(40% 0 35% 0);animation:glitch 6s infinite steps(1)}
+@keyframes glitch{0%,92%,100%{opacity:0}93%{opacity:.8;transform:translateX(-3px)}95%{opacity:.6;transform:translateX(3px)}97%{opacity:0}}
+.path{color:var(--dim);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.path em{font-style:normal;color:var(--soft)}
+.leds{margin-left:auto;display:flex;gap:16px;font-size:11px;letter-spacing:.08em;color:var(--soft);white-space:nowrap}
+.led{display:flex;align-items:center;gap:7px}
+.led i{width:8px;height:8px;border-radius:50%;background:var(--dim)}
+.led.on i{background:var(--ok);box-shadow:0 0 10px var(--ok)}
+.led.off i{background:var(--err);box-shadow:0 0 10px var(--err)}
+.icon-btn{border:1px solid var(--line2);background:var(--panel);border-radius:6px;padding:7px 12px;cursor:pointer;font-size:12px;letter-spacing:.08em;color:var(--cy)}
+.icon-btn:hover{border-color:var(--cy);box-shadow:0 0 12px var(--cy-soft)}
+
+/* shell */
+.shell{display:grid;grid-template-columns:300px minmax(0,1fr);max-width:1500px;margin:0 auto}
+.side{border-right:1px solid var(--line);padding:18px 16px;display:grid;gap:24px;align-content:start;
+  position:sticky;top:56px;max-height:calc(100vh - 56px);overflow:auto}
+.main{padding:20px 24px 60px;display:grid;gap:18px;align-content:start}
+.hd{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:0 0 10px;
+  font:700 12px var(--disp);letter-spacing:.18em;text-transform:uppercase;color:var(--cy)}
+.hd::before{content:"▍";color:var(--mg);margin-right:6px}
+.hd span{flex:1}
+.hd small{font:500 11px var(--mono);letter-spacing:.04em;color:var(--dim);text-transform:none}
+
+/* sidebar lists */
+.item{display:grid;grid-template-columns:2.2em minmax(0,1fr);gap:2px 8px;width:100%;text-align:left;background:transparent;
+  border:1px solid transparent;border-left:2px solid transparent;border-radius:4px;padding:8px 10px;cursor:pointer}
+.item:hover{background:var(--panel2);border-left-color:var(--line2)}
+.item[aria-pressed=true]{background:var(--cy-soft);border-color:rgba(0,240,255,.35);border-left-color:var(--cy)}
+.item .r{color:var(--dim);font-size:12px}
+.item[aria-pressed=true] .r{color:var(--cy)}
+.item b{font-weight:600;font-size:13px}
+.item small{grid-column:2;color:var(--soft);font-size:12px;line-height:1.4}
+.tag{font-size:10px;margin-left:6px;padding:1px 6px;border-radius:3px;border:1px solid var(--line2);color:var(--soft)}
+.proj{display:flex;gap:8px;align-items:center;padding:8px 10px;border-radius:4px}
+.proj:hover{background:var(--panel2)}
+.proj button.open{flex:1;text-align:left;background:none;border:0;cursor:pointer;padding:0}
+.proj button.open small{display:block;color:var(--dim);font-size:11px}
+.empty{padding:12px;border:1px dashed var(--line2);border-radius:4px;color:var(--dim);font-size:12px}
+.x{background:none;border:1px solid var(--line2);border-radius:4px;color:var(--dim);cursor:pointer;font-size:11px;padding:3px 8px}
+.x:hover{color:var(--err);border-color:var(--err)}
+
+/* cards */
+.card{position:relative;background:linear-gradient(180deg,var(--panel),rgba(10,15,26,.85));border:1px solid var(--line2);border-radius:6px;padding:18px}
+.card::before,.card::after{content:"";position:absolute;width:14px;height:14px;border:2px solid var(--cy)}
+.card::before{top:-1px;left:-1px;border-right:0;border-bottom:0}
+.card::after{bottom:-1px;right:-1px;border-left:0;border-top:0;border-color:var(--mg)}
+
+/* length */
+.lenrow{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.big{font:700 clamp(46px,6vw,72px)/.9 var(--disp);color:var(--ink);text-shadow:0 0 18px rgba(0,240,255,.35);font-variant-numeric:tabular-nums}
+.big small{font-size:.35em;color:var(--soft);margin-left:6px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chips label{font-size:11px;color:var(--dim);letter-spacing:.1em;margin-right:4px}
+.chip{min-height:32px;padding:4px 12px;border-radius:4px;border:1px solid var(--line2);background:transparent;color:var(--soft);cursor:pointer;font-size:12px}
+.chip:hover{color:var(--ink);border-color:var(--soft)}
+.chip[aria-pressed=true]{border-color:var(--cy);color:var(--cy);background:var(--cy-soft);box-shadow:0 0 10px var(--cy-soft)}
+.chip.mg[aria-pressed=true]{border-color:var(--mg);color:var(--mg);background:var(--mg-soft)}
+.tl{display:flex;gap:3px;margin:16px 0 6px;height:58px}
+.seg{position:relative;border-radius:3px;background:var(--panel2);border:1px solid var(--line2);overflow:hidden;display:flex;align-items:flex-end;padding:6px 8px;font-size:11px;white-space:nowrap}
+.seg::before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 calc(var(--tick) - 1px),var(--line2) calc(var(--tick) - 1px) var(--tick))}
+.seg .hook{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,var(--mg),rgba(255,43,214,.3))}
+.seg span{position:relative;background:var(--panel2);padding:0 4px;border-radius:2px}
+.scale{display:flex;justify-content:space-between;font-size:11px;color:var(--dim)}
+input[type=range]{width:100%;accent-color:var(--cy);margin-top:6px}
+
+/* form */
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 16px}
+.full{grid-column:1/-1}
+.f{display:grid;gap:6px}
+.f>span{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--soft)}
+.f>span em{font-style:normal;text-transform:none;letter-spacing:0;color:var(--dim)}
+input[type=text],input[type=password],select,textarea{width:100%;background:#03050a;border:1px solid var(--line2);border-radius:4px;padding:10px 12px;color:var(--ink)}
+textarea{min-height:80px;resize:vertical;line-height:1.5}
+input::placeholder,textarea::placeholder{color:var(--dim)}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--cy);box-shadow:0 0 0 3px var(--cy-soft)}
+.picked{padding:10px 12px;border:1px dashed var(--line2);border-radius:4px;color:var(--soft);font-size:12px}
+.picked b{color:var(--mg)}
+.tog{display:flex;align-items:center;gap:10px;cursor:pointer;min-height:42px;font-size:13px}
+.tog input{appearance:none;width:40px;height:22px;border-radius:11px;background:var(--line2);position:relative;cursor:pointer;margin:0;flex:none}
+.tog input::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:var(--soft);transition:transform .15s}
+.tog input:checked{background:var(--cy)}
+.tog input:checked::after{transform:translateX(18px);background:#00151a}
+
+/* buttons */
+.actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.go{position:relative;min-height:46px;padding:8px 24px;border:0;border-radius:4px;cursor:pointer;
+  font:700 14px var(--disp);letter-spacing:.14em;text-transform:uppercase;color:#001418;background:var(--cy);
+  box-shadow:0 0 18px rgba(0,240,255,.45);clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px)}
+.go:hover{filter:brightness(1.12)}
+.go.mg{background:var(--mg);color:#1a0016;box-shadow:0 0 18px rgba(255,43,214,.45)}
+.go:disabled{opacity:.45;cursor:not-allowed;box-shadow:none}
+.btn{min-height:40px;padding:6px 14px;border-radius:4px;border:1px solid var(--line2);background:transparent;cursor:pointer;font-size:12px;letter-spacing:.06em}
+.btn:hover{border-color:var(--cy);color:var(--cy)}
+.status{font-size:12px;color:var(--soft)}
+.status::before{content:"> ";color:var(--cy)}
+.status:empty{display:none}
+.status.err{color:var(--err)}.status.err::before{color:var(--err)}
+
+/* plan */
+.plan{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:18px}
+.term{border:1px solid var(--line2);border-radius:4px;background:#03050a;overflow:hidden}
+.term header{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 10px;background:var(--panel2);border-bottom:1px solid var(--line2);font-size:11px;color:var(--soft)}
+.term header b{color:var(--ink);font-weight:600}
+.term header b::before{content:"● ";color:var(--mg)}
+.term textarea{border:0;border-radius:0;background:transparent;min-height:110px;font-size:12.5px}
+.stack{display:grid;gap:12px}
+.fact{border:1px solid var(--line2);border-radius:4px;padding:12px;background:var(--panel)}
+.fact h3{margin:0 0 6px;font:700 11px var(--disp);letter-spacing:.16em;text-transform:uppercase;color:var(--mg)}
+.fact p{margin:0;white-space:pre-line;overflow-wrap:anywhere}
+.warn{border:1px solid rgba(255,176,32,.5);background:rgba(255,176,32,.08);color:var(--amb);padding:10px 12px;border-radius:4px;font-size:12px}
+
+/* render */
+.prog{height:10px;border-radius:2px;background:var(--panel2);border:1px solid var(--line2);overflow:hidden}
+.prog i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--cy),var(--mg));box-shadow:0 0 12px var(--cy);transition:width .6s}
+.log{font-size:12px;color:var(--soft);max-height:140px;overflow:auto;background:#03050a;border:1px solid var(--line);border-radius:4px;padding:8px 10px}
+.log div::before{content:"$ ";color:var(--cy)}
+video{width:100%;max-width:360px;border-radius:6px;border:1px solid var(--cy);box-shadow:0 0 24px var(--cy-soft);background:#000}
+.out{display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start}
+a{color:var(--cy)}
+[hidden]{display:none!important}
+
+/* modal */
+.modal{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.7);display:grid;place-items:center;padding:16px}
+.modal .card{width:100%;max-width:520px;display:grid;gap:14px}
+.hint{font-size:12px;color:var(--dim)}
+
+@media(max-width:1000px){.plan{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:860px){.shell{grid-template-columns:minmax(0,1fr)}.side{position:static;max-height:none;border-right:0;border-top:1px solid var(--line);order:2}.path{display:none}}
+@media(max-width:600px){.grid{grid-template-columns:minmax(0,1fr)}.leds .lbl{display:none}.main{padding:16px}}
+@media(prefers-reduced-motion:reduce){.logo::after{animation:none}.prog i{transition:none}}
+</style>
+</head>
+<body>
+<header class="bar">
+  <div class="logo" data-t="CZ//STUDIO"><b>CZ</b><span>//</span>STUDIO</div>
+  <div class="path">root@cz:~/<em>video-deck</em> · higgsfield-pipeline</div>
+  <div class="leds">
+    <span class="led" id="ledLLM"><i></i><span class="lbl">TEXT-KI</span></span>
+    <span class="led" id="ledHF"><i></i><span class="lbl">HIGGSFIELD</span></span>
+  </div>
+  <button class="icon-btn" id="openSettings" type="button">⚙ SETUP</button>
+</header>
+
+<div class="shell">
+  <aside class="side">
+    <section>
+      <div class="hd"><span>trends.feed</span><small id="tstand">lädt …</small></div>
+      <div id="trends"></div>
+      <button class="item" type="button" id="own" aria-pressed="false"><span class="r">+</span><b>Eigene Idee</b><small>Ohne Vorlage, nur deine Story.</small></button>
+    </section>
+    <section>
+      <div class="hd"><span>projekte</span><small id="pcount"></small></div>
+      <div id="projects"><div class="empty">Noch keine Projekte.</div></div>
+    </section>
+  </aside>
+
+  <main class="main">
+    <section class="card" aria-labelledby="lh">
+      <div class="lenrow">
+        <div>
+          <div class="hd" id="lh"><span>videolänge</span></div>
+          <div class="big"><span id="lenbig">15</span><small>SEK</small></div>
+        </div>
+        <div class="stack" style="gap:8px">
+          <div class="chips" id="presets"><label>LÄNGE</label></div>
+          <div class="chips" id="clipchips"><label>CLIP</label></div>
+        </div>
+      </div>
+      <div class="tl" id="tl" aria-hidden="true"></div>
+      <div class="scale"><span>0s</span><span id="clips">3 Clips</span><span id="lenend">15s</span></div>
+      <input type="range" id="len" min="5" max="60" step="5" value="15" aria-label="Videolänge in Sekunden">
+    </section>
+
+    <section class="card" aria-label="Eingaben">
+      <div class="hd"><span>briefing</span><small>was soll passieren?</small></div>
+      <form class="grid" id="f" autocomplete="off">
+        <label class="f full"><span>nische</span><input type="text" id="niche" placeholder="albanisch, Diepholz, Katzen, Gym …"></label>
+        <div class="full picked" id="picked">Trend links wählen oder „Eigene Idee“.</div>
+        <label class="f full"><span>story <em>· optional, bei eigener Idee Pflicht</em></span><textarea id="idea" placeholder="Was soll passieren? 1–3 Sätze."></textarea></label>
+        <label class="f"><span>figuren</span><input type="text" id="chars" placeholder="Arbus80, die Wassermelone"></label>
+        <label class="f"><span>ort</span><input type="text" id="place" placeholder="Rathaus Diepholz"></label>
+        <label class="f"><span>stil</span><select id="style"></select></label>
+        <label class="f"><span>plattform</span><select id="platform"></select></label>
+        <label class="f"><span>ton</span><select id="tone"></select></label>
+        <label class="f"><span>stimme</span><select id="voice"></select></label>
+        <div class="f full"><label class="tog"><input type="checkbox" id="subs" checked> Deutsche Untertitel einblenden</label></div>
+        <div class="full actions">
+          <button class="go" type="submit" id="planBtn">▶ Plan erstellen</button>
+          <span class="hint">Kostet kein Higgsfield-Guthaben. Du kannst alles danach bearbeiten.</span>
+          <span class="status" id="status" role="status"></span>
+        </div>
+      </form>
+    </section>
+
+    <section class="card" id="planCard" hidden aria-labelledby="ph">
+      <div class="hd" id="ph"><span>plan</span><small id="planTitle"></small></div>
+      <div class="plan">
+        <div class="stack">
+          <article class="term"><header><b>voiceover.de</b><span id="scriptLen"></span></header><textarea id="script"></textarea></article>
+          <div id="clipPrompts" class="stack"></div>
+        </div>
+        <div class="stack">
+          <div class="fact"><h3>hook · 0–2s</h3><p id="hook"></p></div>
+          <div class="fact"><h3>caption</h3><p id="caption"></p></div>
+          <div class="actions"><button class="btn" type="button" id="saveBtn">Projekt speichern</button><button class="btn" type="button" id="replanBtn">Neu planen</button></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" id="renderCard" hidden aria-labelledby="rh">
+      <div class="hd" id="rh"><span>render</span><small id="renderInfo"></small></div>
+      <div class="stack">
+        <div class="warn" id="costNote"></div>
+        <label class="tog"><input type="checkbox" id="confirm"> Mir ist klar: Jeder Clip kostet Higgsfield-API-Guthaben.</label>
+        <div class="actions"><button class="go mg" type="button" id="renderBtn" disabled>⚡ Video rendern</button><span class="status" id="rstatus"></span></div>
+        <div class="prog" id="prog" hidden><i id="progFill"></i></div>
+        <div class="log" id="log" hidden></div>
+        <div class="out" id="out"></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="modal" id="settings" hidden role="dialog" aria-modal="true" aria-labelledby="sh">
+  <form class="card" id="sf" autocomplete="off">
+    <div class="hd" id="sh"><span>setup</span><small>Schlüssel bleiben nur auf deinem Mac</small></div>
+    <label class="f"><span>text-ki (schreibt skript + prompts)</span><select id="llmProvider"></select></label>
+    <label class="f"><span>api-schlüssel text-ki <em>· leer lassen = behalten</em></span><input type="password" id="llmKey" placeholder="sk-…"></label>
+    <label class="f"><span>higgsfield api-schlüssel <em>· KEY_ID:KEY_SECRET</em></span><input type="password" id="hfKey" placeholder="leer lassen = behalten"></label>
+    <label class="f"><span>higgsfield modell</span><input type="text" id="hfModel"></label>
+    <p class="hint">Schlüssel bekommst du bei console.higgsfield.ai (Higgsfield) bzw. beim Anbieter der Text-KI, z. B. platform.claude.com für Anthropic.</p>
+    <div class="actions"><button class="go" type="submit">Speichern</button><button class="btn" type="button" id="closeSettings">Schließen</button><span class="status" id="sstatus"></span></div>
+  </form>
+</div>
+
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const API = '/api/v1';
+const S = {status:null, trends:[], pick:null, plan:null, projectId:null, taskId:null, poll:null, clip:5};
+const FIELDS = ['niche','idea','chars','place','style','platform','tone','voice'];
+const pad = n => String(n).padStart(2,'0');
+
+async function call(path, opts={}) {
+  const res = await fetch(API + path, {headers:{'Content-Type':'application/json'}, ...opts});
+  let body = null; try { body = await res.json(); } catch (e) {}
+  if (!res.ok || (body && body.status && body.status !== 200)) {
+    const msg = body && (body.message || body.detail) ? (body.message || JSON.stringify(body.detail)) : ('HTTP ' + res.status);
+    throw new Error(String(msg).replace(/^[^:]*:\s*/, ''));
+  }
+  return body ? body.data : null;
+}
+const setStatus = (el, text, err) => { $(el).textContent = text; $(el).classList.toggle('err', !!err); };
+
+/* ---------- length timeline ---------- */
+function parts(){ const L = +$('len').value, c = S.clip, n = Math.max(1, Math.ceil(L / c)); return Array(n).fill(c); }
+function drawTimeline(){
+  const L = +$('len').value, p = parts();
+  $('lenbig').textContent = L; $('lenend').textContent = L + 's';
+  $('clips').textContent = p.length === 1 ? '1 Clip' : p.length + ' Clips à ' + S.clip + 's';
+  $('tl').innerHTML = p.map((s,i) => `<div class="seg" style="flex:${s} 1 0;--tick:${(5/s*100).toFixed(2)}%">${i===0?`<i class="hook" style="width:${(2/s*100).toFixed(1)}%"></i>`:''}<span>${p.length>6?'#'+(i+1):'clip_'+(i+1)}</span></div>`).join('');
+  $('presets').innerHTML = '<label>LÄNGE</label>' + [10,15,30,60].map(v => `<button type="button" class="chip" data-v="${v}" aria-pressed="${v===L}">${v}s</button>`).join('');
+  $('clipchips').innerHTML = '<label>CLIP</label>' + [5,10].map(v => `<button type="button" class="chip mg" data-c="${v}" aria-pressed="${v===S.clip}">${v}s</button>`).join('');
+  updateCost();
+}
+
+/* ---------- trends / projects ---------- */
+function renderTrends(){
+  $('trends').innerHTML = S.trends.length ? S.trends.map((t,i) => `<button type="button" class="item" data-i="${i}" aria-pressed="${S.pick===i}"><span class="r">${pad(i+1)}</span><b>${esc(t.name)}${t.status?`<span class="tag">${esc(t.status)}</span>`:''}</b><small>${esc(t.desc)}</small></button>`).join('') : '<div class="empty">Keine Trends gespeichert.</div>';
+  $('own').setAttribute('aria-pressed', S.pick === 'own');
+  const t = typeof S.pick === 'number' ? S.trends[S.pick] : null;
+  $('picked').innerHTML = t ? `vorlage: <b>${esc(t.name)}</b> — ${esc(t.desc)}` : S.pick === 'own' ? 'vorlage: <b>Eigene Idee</b> — Story unten eintragen.' : 'Trend links wählen oder „Eigene Idee“.';
+}
+async function loadTrends(){
+  try { const d = await call('/cz/trends'); S.trends = d.items || []; $('tstand').textContent = d.examples ? 'Beispiele' : (d.updated || 'gespeichert'); }
+  catch (e) { $('tstand').textContent = 'offline'; }
+  renderTrends();
+}
+async function loadProjects(){
+  try {
+    const d = await call('/cz/projects'); const list = d.projects || [];
+    $('pcount').textContent = list.length || '';
+    $('projects').innerHTML = list.length ? list.map(p => {
+      const dt = new Date(p.created).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+      return `<div class="proj"><button type="button" class="open" data-id="${esc(p.id)}">${esc(p.name)}<small>${esc(p.inputs?.niche||'–')} · ${esc(p.inputs?.len||'')}s · ${dt}${p.task_id?' · gerendert':''}</small></button><button type="button" class="x" data-del="${esc(p.id)}">✕</button></div>`;
+    }).join('') : '<div class="empty">Noch keine Projekte.</div>';
+    S.projects = list;
+  } catch (e) { $('projects').innerHTML = '<div class="empty">Projekte nicht ladbar.</div>'; }
+}
+
+/* ---------- status / settings ---------- */
+function fillSelect(id, values, keep){ const cur = $(id).value; $(id).innerHTML = values.map(v => `<option>${esc(v)}</option>`).join(''); if (keep && values.includes(cur)) $(id).value = cur; }
+async function loadStatus(){
+  try {
+    S.status = await call('/cz/status');
+    $('ledLLM').className = 'led ' + (S.status.llm_ready ? 'on' : 'off');
+    $('ledHF').className = 'led ' + (S.status.higgsfield_ready ? 'on' : 'off');
+    fillSelect('style', S.status.styles, true); fillSelect('platform', S.status.platforms, true);
+    fillSelect('tone', S.status.tones, true); fillSelect('voice', S.status.voices, true);
+    fillSelect('llmProvider', S.status.llm_providers, false);
+    if (S.status.llm_providers.includes(S.status.llm_provider)) $('llmProvider').value = S.status.llm_provider;
+    $('hfModel').value = S.status.higgsfield_model;
+    restoreDraft();
+    updateCost();
+  } catch (e) {
+    $('ledLLM').className = 'led off'; $('ledHF').className = 'led off';
+    setStatus('status', 'Keine Verbindung zum CZ-Server. Läuft das Terminal-Fenster noch?', true);
+  }
+}
+$('openSettings').onclick = () => { $('settings').hidden = false; $('llmKey').focus(); };
+$('closeSettings').onclick = () => { $('settings').hidden = true; };
+$('settings').addEventListener('click', e => { if (e.target === $('settings')) $('settings').hidden = true; });
+$('sf').addEventListener('submit', async e => {
+  e.preventDefault(); setStatus('sstatus', 'speichere …');
+  try {
+    await call('/cz/settings', {method:'POST', body: JSON.stringify({llm_provider:$('llmProvider').value, llm_api_key:$('llmKey').value, higgsfield_api_key:$('hfKey').value, higgsfield_model:$('hfModel').value})});
+    $('llmKey').value = ''; $('hfKey').value = '';
+    setStatus('sstatus', 'gespeichert'); await loadStatus();
+  } catch (err) { setStatus('sstatus', err.message, true); }
+});
+
+/* ---------- inputs ---------- */
+function inputs(){
+  const o = {}; FIELDS.forEach(k => o[k] = $(k).value.trim());
+  o.len = +$('len').value; o.clip = S.clip; o.length = o.len; o.subs = $('subs').checked;
+  o.trend = typeof S.pick === 'number' ? S.trends[S.pick] : null; o.own = S.pick === 'own';
+  return o;
+}
+function setInputs(o){
+  FIELDS.forEach(k => { if (o[k] != null && $(k)) $(k).value = o[k]; });
+  if (o.len) $('len').value = o.len; if (o.clip) S.clip = o.clip;
+  $('subs').checked = o.subs !== false;
+  S.pick = o.own ? 'own' : (o.trend ? S.trends.findIndex(t => t.name === o.trend.name) : null);
+  if (S.pick === -1) S.pick = null;
+  drawTimeline(); renderTrends();
+}
+function saveDraft(){ try { localStorage.setItem('cz-draft', JSON.stringify(inputs())); } catch (e) {} }
+function restoreDraft(){ try { const d = JSON.parse(localStorage.getItem('cz-draft') || 'null'); if (d) setInputs(d); } catch (e) {} }
+
+/* ---------- plan ---------- */
+function showPlan(){
+  const p = S.plan; if (!p) return;
+  $('planCard').hidden = false; $('renderCard').hidden = false;
+  $('planTitle').textContent = p.title;
+  $('script').value = p.script; $('hook').textContent = p.hook || '–';
+  $('caption').textContent = [p.caption, p.hashtags].filter(Boolean).join('\n');
+  $('clipPrompts').innerHTML = p.clips.map((c,i) => `<article class="term"><header><b>clip_${i+1}.prompt</b><span>${S.clip}s · Higgsfield</span></header><textarea data-clip="${i}">${esc(c)}</textarea></article>`).join('');
+  updateScriptLen(); updateCost();
+}
+function readPlan(){
+  if (!S.plan) return null;
+  S.plan.script = $('script').value.trim();
+  S.plan.clips = [...document.querySelectorAll('[data-clip]')].map(t => t.value.trim()).filter(Boolean);
+  return S.plan;
+}
+function updateScriptLen(){ const w = $('script').value.trim().split(/\s+/).filter(Boolean).length; $('scriptLen').textContent = w + ' Wörter ≈ ' + Math.round(w/2.3) + 's'; }
+function updateCost(){
+  const n = S.plan ? S.plan.clips.length : parts().length;
+  $('costNote').textContent = `Higgsfield erzeugt bis zu ${n} Clip(s) à ${S.clip}s (Modell: ${S.status ? S.status.higgsfield_model : '…'}). Abgerechnet wird pro Clip von deinem API-Guthaben. Es wird nur so viel erzeugt, wie die Sprachausgabe braucht.`;
+  $('renderInfo').textContent = n + ' Clips';
+  $('renderBtn').disabled = !($('confirm').checked && S.plan);
+}
+async function makePlan(){
+  const o = inputs();
+  if (!o.niche) { setStatus('status', 'Nische fehlt.', true); $('niche').focus(); return; }
+  if (S.pick == null) { setStatus('status', 'Trend links wählen oder „Eigene Idee“.', true); return; }
+  if (o.own && !o.idea) { setStatus('status', 'Bei eigener Idee bitte eine Story eintragen.', true); $('idea').focus(); return; }
+  if (S.status && !S.status.llm_ready) { setStatus('status', 'Text-KI fehlt: oben rechts ⚙ SETUP öffnen und Schlüssel eintragen.', true); return; }
+  $('planBtn').disabled = true; $('replanBtn').disabled = true; setStatus('status', 'Text-KI schreibt Skript und Clip-Prompts …');
+  try {
+    S.plan = await call('/cz/plan', {method:'POST', body: JSON.stringify(o)});
+    S.projectId = null; S.taskId = null; $('out').innerHTML = ''; $('prog').hidden = true; $('log').hidden = true;
+    showPlan(); setStatus('status', 'Plan fertig. Prüfen, anpassen, dann rendern.');
+    $('planCard').scrollIntoView({behavior:'smooth', block:'start'});
+  } catch (e) { setStatus('status', 'Plan fehlgeschlagen: ' + e.message, true); }
+  finally { $('planBtn').disabled = false; $('replanBtn').disabled = false; }
+}
+async function saveProject(extra={}){
+  const plan = readPlan(); if (!plan) return;
+  const p = await call('/cz/projects', {method:'POST', body: JSON.stringify({id:S.projectId, name:plan.title, inputs:inputs(), plan, ...extra})});
+  S.projectId = p.id; loadProjects(); return p;
+}
+
+/* ---------- render ---------- */
+function logLine(t){ $('log').hidden = false; const d = document.createElement('div'); d.textContent = new Date().toLocaleTimeString('de-DE') + '  ' + t; $('log').appendChild(d); $('log').scrollTop = 1e9; }
+async function render(){
+  const plan = readPlan();
+  if (!plan || !plan.script || !plan.clips.length) { setStatus('rstatus', 'Plan braucht Text und mindestens einen Clip-Prompt.', true); return; }
+  if (S.status && !S.status.higgsfield_ready) { setStatus('rstatus', 'Higgsfield-Schlüssel fehlt: ⚙ SETUP öffnen.', true); return; }
+  $('renderBtn').disabled = true; setStatus('rstatus', 'starte …'); $('log').innerHTML = ''; $('out').innerHTML = '';
+  try {
+    const d = await call('/cz/render', {method:'POST', body: JSON.stringify({...inputs(), plan, confirm_charge:true})});
+    S.taskId = d.task_id; logLine('Auftrag ' + S.taskId.slice(0,8) + ' gestartet');
+    await saveProject({task_id:S.taskId});
+    $('prog').hidden = false; watch(S.taskId);
+  } catch (e) { setStatus('rstatus', e.message, true); $('renderBtn').disabled = false; }
+}
+function watch(taskId){
+  clearInterval(S.poll); let last = -1;
+  const tick = async () => {
+    try {
+      const t = await call('/tasks/' + encodeURIComponent(taskId));
+      const pr = Math.round(t.progress || 0);
+      $('progFill').style.width = pr + '%';
+      if (pr !== last) { logLine('Fortschritt ' + pr + '%'); last = pr; }
+      setStatus('rstatus', 'läuft … ' + pr + '%');
+      if (t.state === 1) { clearInterval(S.poll); done(t); }
+      else if (t.state === -1) { clearInterval(S.poll); setStatus('rstatus', 'Fehlgeschlagen: ' + (t.error || t.message || 'siehe Terminal'), true); $('renderBtn').disabled = !$('confirm').checked; }
+    } catch (e) { setStatus('rstatus', 'Status nicht abrufbar: ' + e.message, true); }
+  };
+  tick(); S.poll = setInterval(tick, 3000);
+}
+function done(t){
+  const vids = t.videos || t.combined_videos || [];
+  setStatus('rstatus', 'Fertig.'); logLine('Video fertig'); $('progFill').style.width = '100%';
+  $('out').innerHTML = vids.map(v => `<div class="stack"><video src="${esc(v)}" controls playsinline></video><a href="${esc(v)}" download>⬇ Video herunterladen</a></div>`).join('') || '<div class="empty">Kein Video gefunden.</div>';
+  $('renderBtn').disabled = !$('confirm').checked;
+}
+
+/* ---------- events ---------- */
+$('len').addEventListener('input', () => { drawTimeline(); saveDraft(); });
+$('presets').addEventListener('click', e => { const b = e.target.closest('[data-v]'); if (!b) return; $('len').value = b.dataset.v; drawTimeline(); saveDraft(); });
+$('clipchips').addEventListener('click', e => { const b = e.target.closest('[data-c]'); if (!b) return; S.clip = +b.dataset.c; drawTimeline(); saveDraft(); });
+$('trends').addEventListener('click', e => { const b = e.target.closest('[data-i]'); if (!b) return; S.pick = +b.dataset.i; renderTrends(); saveDraft(); });
+$('own').addEventListener('click', () => { S.pick = 'own'; renderTrends(); saveDraft(); $('idea').focus(); });
+$('f').addEventListener('input', saveDraft);
+$('f').addEventListener('submit', e => { e.preventDefault(); makePlan(); });
+$('replanBtn').onclick = makePlan;
+$('script').addEventListener('input', updateScriptLen);
+$('confirm').addEventListener('change', updateCost);
+$('renderBtn').onclick = render;
+$('saveBtn').onclick = async () => { try { await saveProject(); $('saveBtn').textContent = 'Gespeichert ✓'; } catch (e) { $('saveBtn').textContent = 'Fehler'; } setTimeout(() => $('saveBtn').textContent = 'Projekt speichern', 1600); };
+$('projects').addEventListener('click', async e => {
+  const o = e.target.closest('.open'), d = e.target.closest('[data-del]');
+  if (o) { const p = (S.projects||[]).find(x => x.id === o.dataset.id); if (!p) return;
+    setInputs(p.inputs || {}); S.plan = p.plan; S.projectId = p.id; S.taskId = p.task_id || null; $('out').innerHTML = '';
+    if (S.plan) showPlan(); if (S.taskId) { $('prog').hidden = false; watch(S.taskId); } }
+  if (d) { if (d.dataset.sure !== '1') { d.dataset.sure = '1'; d.textContent = 'sicher?'; setTimeout(() => { d.dataset.sure = ''; d.textContent = '✕'; }, 3000); return; }
+    try { await call('/cz/projects/' + encodeURIComponent(d.dataset.del), {method:'DELETE'}); loadProjects(); } catch (err) {} }
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') $('settings').hidden = true; if ((e.metaKey||e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); makePlan(); } });
+
+drawTimeline();
+Promise.all([loadTrends(), loadStatus(), loadProjects()]);
+})();
+</script>
+</body>
+</html>

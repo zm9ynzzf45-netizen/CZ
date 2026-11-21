@@ -33,12 +33,23 @@ mkdir -p "\$REPO_DIR/storage"
 cd "\$REPO_DIR"
 echo "CZ startet ... bitte kurz warten."
 echo "Zum Beenden dieses Fenster schließen."
-./webui.sh > "\$LOG" 2>&1 &
+# CZ Studio (eigene Oberfläche) läuft auf dem API-Server, nur lokal erreichbar.
+PORT=\$(uv run --frozen python -c 'import socket
+for p in range(8080, 8180):
+    s = socket.socket()
+    try:
+        s.bind(("127.0.0.1", p)); print(p); break
+    except OSError:
+        pass
+    finally:
+        s.close()')
+echo "***** CZ address: http://127.0.0.1:\$PORT/cz/ *****" > "\$LOG"
+uv run --frozen uvicorn app.asgi:app --host 127.0.0.1 --port "\$PORT" >> "\$LOG" 2>&1 &
 SERVER_PID=\$!
 trap 'kill \$SERVER_PID 2>/dev/null; rm -f "\$URL_FILE"' EXIT
 URL=""
 for i in \$(seq 1 120); do
-  URL=\$(grep -o 'http://127.0.0.1:[0-9]*' "\$LOG" | head -1)
+  URL=\$(grep -o 'http://127.0.0.1:[0-9]*/cz/' "\$LOG" | head -1)
   if [ -n "\$URL" ] && curl -s -o /dev/null "\$URL"; then break; fi
   if ! kill -0 \$SERVER_PID 2>/dev/null; then echo "CZ konnte nicht starten:"; tail -20 "\$LOG"; read -r -p "Enter zum Schließen"; exit 1; fi
   sleep 1

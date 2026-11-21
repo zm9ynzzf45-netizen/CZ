@@ -12,3 +12,6 @@
 - Fork von MoneyPrinterTurbo, erweitert zu CZ (KI-Kurzvideos für TikTok/Reels/Shorts).
 - Higgsfield ist als Videoquelle `higgsfield` eingebaut (`app/services/material.py`).
 - Mac-Installer: `scripts/mac/install_cz_app.sh` legt `~/Applications/CZ.app` an.
+- CZ Studio (eigene Oberfläche): `resource/public/cz/index.html`, API unter
+  `/api/v1/cz/*` (`app/controllers/v1/cz.py`, `app/services/cz.py`).
+  Ablauf: Plan (Text-KI, kostenlos) → Rendern (Higgsfield, kostet).
