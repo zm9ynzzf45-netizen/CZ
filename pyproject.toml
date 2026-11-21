@@ -126,3 +126,6 @@ package = true
 # MoviePy 2.2.1 caps Pillow below 12; patched Pillow is required for image decoding.
 # Keep this in sync with requirements-security.txt for container/legacy installs.
 override-dependencies = ["pillow>=13.0.0,<14"]
+# onnxruntime 1.24+ ships macOS wheels only for macOS 14+. Keep macOS 13
+# (Ventura) installable by resolving an older onnxruntime on macOS.
+constraint-dependencies = ["onnxruntime<1.24; sys_platform == 'darwin'"]
