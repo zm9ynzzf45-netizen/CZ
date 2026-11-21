@@ -31,6 +31,7 @@ REPO_DIR="$REPO_DIR"
 LOG="\$REPO_DIR/storage/cz-app.log"
 mkdir -p "\$REPO_DIR/storage"
 cd "\$REPO_DIR"
+export CZ_APP_PATH="$APP_DIR"
 echo "=== CZ Start \$(date) ===" > "\$LOG"
 if ! uv run --frozen python scripts/mac/cz_desktop.py >> "\$LOG" 2>&1; then
   osascript -e 'display dialog "CZ konnte nicht starten. Details stehen in ~/cz/storage/cz-app.log – schick sie Claude." buttons {"OK"} default button 1 with icon caution with title "CZ"' >/dev/null 2>&1

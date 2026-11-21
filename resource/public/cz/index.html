@@ -159,6 +159,25 @@ video{width:100%;max-width:360px;border-radius:6px;border:1px solid var(--cy);bo
 a{color:var(--cy)}
 [hidden]{display:none!important}
 
+/* trend detail + score */
+.score{display:inline-flex;gap:2px;margin-left:6px;vertical-align:middle}
+.score i{width:5px;height:9px;background:var(--line2);border-radius:1px}
+.score i.on{background:var(--cy);box-shadow:0 0 6px var(--cy)}
+.tag.up{color:var(--ok);border-color:rgba(57,255,156,.4)}
+.tag.new{color:var(--mg);border-color:rgba(255,43,214,.4)}
+.trendbar{display:grid;gap:8px;margin-bottom:10px}
+.trendbar .row{display:flex;gap:6px}
+.trendbar select{padding:7px 8px;font-size:12px}
+.mini{min-height:34px;padding:4px 10px;border-radius:4px;border:1px solid var(--cy);background:var(--cy-soft);color:var(--cy);cursor:pointer;font-size:12px;letter-spacing:.06em;white-space:nowrap}
+.mini:disabled{opacity:.5;cursor:progress}
+.src{font-size:11px;color:var(--amb)}
+.detail{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.detail .fact.full{grid-column:1/-1}
+.detail h2{margin:0;font:700 22px var(--disp);letter-spacing:.04em}
+.update-box{display:grid;gap:10px}
+.update-box ul{margin:0;padding-left:18px;color:var(--soft);font-size:12px}
+@media(max-width:700px){.detail{grid-template-columns:minmax(0,1fr)}}
+
 /* modal */
 .modal{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.7);display:grid;place-items:center;padding:16px}
 .modal .card{width:100%;max-width:520px;display:grid;gap:14px}
@@ -178,13 +197,19 @@ a{color:var(--cy)}
     <span class="led" id="ledLLM"><i></i><span class="lbl">TEXT-KI</span></span>
     <span class="led" id="ledHF"><i></i><span class="lbl">HIGGSFIELD</span></span>
   </div>
+  <button class="icon-btn" id="openUpdate" type="button">⟳ UPDATE</button>
   <button class="icon-btn" id="openSettings" type="button">⚙ SETUP</button>
 </header>
 
 <div class="shell">
   <aside class="side">
     <section>
-      <div class="hd"><span>trends.feed</span><small id="tstand">lädt …</small></div>
+      <div class="hd"><span>trend.radar</span><small id="tstand">lädt …</small></div>
+      <div class="trendbar">
+        <div class="row"><select id="tplat" aria-label="Plattform für die Trend-Auswertung"><option value="TikTok und Instagram Reels">TikTok + Instagram</option><option value="TikTok">TikTok</option><option value="Instagram Reels">Instagram</option></select>
+        <button class="mini" type="button" id="analyzeBtn">⟲ Top 10 auswerten</button></div>
+        <div class="src" id="tsrc"></div>
+      </div>
       <div id="trends"></div>
       <button class="item" type="button" id="own" aria-pressed="false"><span class="r">+</span><b>Eigene Idee</b><small>Ohne Vorlage, nur deine Story.</small></button>
     </section>
@@ -195,6 +220,11 @@ a{color:var(--cy)}
   </aside>
 
   <main class="main">
+    <section class="card" id="trendCard" hidden aria-labelledby="tdh">
+      <div class="hd" id="tdh"><span>trend.detail</span><small id="tdMeta"></small></div>
+      <div class="detail" id="trendDetail"></div>
+    </section>
+
     <section class="card" aria-labelledby="lh">
       <div class="lenrow">
         <div>
@@ -222,8 +252,9 @@ a{color:var(--cy)}
         <label class="f"><span>stil</span><select id="style"></select></label>
         <label class="f"><span>plattform</span><select id="platform"></select></label>
         <label class="f"><span>ton</span><select id="tone"></select></label>
+        <label class="f"><span>sprache <em>· Stimme + Untertitel</em></span><select id="lang"><option value="de">Deutsch</option><option value="en">Englisch</option></select></label>
         <label class="f"><span>stimme</span><select id="voice"></select></label>
-        <div class="f full"><label class="tog"><input type="checkbox" id="subs" checked> Deutsche Untertitel einblenden</label></div>
+        <div class="f full"><label class="tog"><input type="checkbox" id="subs" checked> <span id="subsLabel">Deutsche Untertitel einblenden</span></label></div>
         <div class="full actions">
           <button class="go" type="submit" id="planBtn">▶ Plan erstellen</button>
           <span class="hint">Kostet kein Higgsfield-Guthaben. Du kannst alles danach bearbeiten.</span>
@@ -261,6 +292,15 @@ a{color:var(--cy)}
   </main>
 </div>
 
+<div class="modal" id="update" hidden role="dialog" aria-modal="true" aria-labelledby="uh">
+  <div class="card update-box">
+    <div class="hd" id="uh"><span>update</span><small>neueste CZ-Version von GitHub</small></div>
+    <p class="hint" id="uText">Holt die neueste Version, die Claude gebaut hat, und installiert sie. Deine Projekte und Schlüssel bleiben erhalten.</p>
+    <ul id="uChanges" hidden></ul>
+    <div class="actions"><button class="go" type="button" id="uRun">⟳ Jetzt aktualisieren</button><button class="go mg" type="button" id="uRestart" hidden>CZ neu starten</button><button class="btn" type="button" id="uClose">Schließen</button><span class="status" id="ustatus"></span></div>
+  </div>
+</div>
+
 <div class="modal" id="settings" hidden role="dialog" aria-modal="true" aria-labelledby="sh">
   <form class="card" id="sf" autocomplete="off">
     <div class="hd" id="sh"><span>setup</span><small>Schlüssel bleiben nur auf deinem Mac</small></div>
@@ -279,7 +319,7 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const API = '/api/v1';
 const S = {status:null, trends:[], pick:null, plan:null, projectId:null, taskId:null, poll:null, clip:5};
-const FIELDS = ['niche','idea','chars','place','style','platform','tone','voice'];
+const FIELDS = ['niche','idea','chars','place','style','platform','tone','lang','voice'];
 const pad = n => String(n).padStart(2,'0');
 
 async function call(path, opts={}) {
@@ -306,16 +346,42 @@ function drawTimeline(){
 }
 
 /* ---------- trends / projects ---------- */
+function scoreBar(n){ n = +n || 0; return n ? `<span class="score" title="Viral-Potenzial ${n}/10">${Array.from({length:10},(_,i)=>`<i class="${i<n?'on':''}"></i>`).join('')}</span>` : ''; }
+function statusTag(t){ if (!t.status) return ''; const c = /steig/i.test(t.status) ? 'up' : /neu/i.test(t.status) ? 'new' : ''; return `<span class="tag ${c}">${esc(t.status)}</span>`; }
 function renderTrends(){
-  $('trends').innerHTML = S.trends.length ? S.trends.map((t,i) => `<button type="button" class="item" data-i="${i}" aria-pressed="${S.pick===i}"><span class="r">${pad(i+1)}</span><b>${esc(t.name)}${t.status?`<span class="tag">${esc(t.status)}</span>`:''}</b><small>${esc(t.desc)}</small></button>`).join('') : '<div class="empty">Keine Trends gespeichert.</div>';
+  $('trends').innerHTML = S.trends.length ? S.trends.map((t,i) => `<button type="button" class="item" data-i="${i}" aria-pressed="${S.pick===i}"><span class="r">${pad(i+1)}</span><b>${esc(t.name)}${statusTag(t)}</b><small>${t.platform?esc(t.platform)+' · ':''}${esc(t.desc)}${scoreBar(t.score)}</small></button>`).join('') : '<div class="empty">Keine Trends gespeichert.</div>';
   $('own').setAttribute('aria-pressed', S.pick === 'own');
   const t = typeof S.pick === 'number' ? S.trends[S.pick] : null;
   $('picked').innerHTML = t ? `vorlage: <b>${esc(t.name)}</b> — ${esc(t.desc)}` : S.pick === 'own' ? 'vorlage: <b>Eigene Idee</b> — Story unten eintragen.' : 'Trend links wählen oder „Eigene Idee“.';
 }
+function showTrendMeta(d){
+  $('tstand').textContent = d.examples ? 'Beispiele' : (d.updated || 'gespeichert');
+  $('tsrc').textContent = d.source ? `${d.source} für „${d.niche || 'allgemein'}“ · keine Live-Daten von TikTok/Instagram` : 'Noch keine Auswertung. Nische eintragen, dann „Top 10 auswerten“.';
+}
 async function loadTrends(){
-  try { const d = await call('/cz/trends'); S.trends = d.items || []; $('tstand').textContent = d.examples ? 'Beispiele' : (d.updated || 'gespeichert'); }
+  try { const d = await call('/cz/trends'); S.trends = d.items || []; showTrendMeta(d); }
   catch (e) { $('tstand').textContent = 'offline'; }
   renderTrends();
+}
+async function analyzeTrends(){
+  const niche = $('niche').value.trim();
+  if (!niche) { setStatus('status', 'Für die Trend-Auswertung zuerst eine Nische eintragen.', true); $('niche').focus(); return; }
+  if (S.status && !S.status.llm_ready) { setStatus('status', 'Text-KI fehlt: oben rechts ⚙ SETUP öffnen und Schlüssel eintragen.', true); return; }
+  $('analyzeBtn').disabled = true; $('analyzeBtn').textContent = '⟲ analysiere …';
+  try { const d = await call('/cz/trends/analyze', {method:'POST', body: JSON.stringify({niche, platform:$('tplat').value})});
+    S.trends = d.items || []; S.pick = null; showTrendMeta(d); renderTrends(); setStatus('status', S.trends.length + ' Trends ausgewertet. Links einen anklicken.'); }
+  catch (e) { setStatus('status', 'Trend-Auswertung fehlgeschlagen: ' + e.message, true); }
+  finally { $('analyzeBtn').disabled = false; $('analyzeBtn').textContent = '⟲ Top 10 auswerten'; }
+}
+function showTrendDetail(i){
+  const t = S.trends[i]; if (!t) { $('trendCard').hidden = true; return; }
+  $('trendCard').hidden = false;
+  $('tdMeta').innerHTML = `${esc(t.platform||'')} ${statusTag(t)} ${scoreBar(t.score)}`;
+  const f = (h, v, full) => v ? `<div class="fact${full?' full':''}"><h3>${h}</h3><p>${esc(v)}</p></div>` : '';
+  $('trendDetail').innerHTML = `<div class="full"><h2>${esc(t.name)}</h2><p class="hint">${esc(t.desc||'')}</p></div>`
+    + f('warum es funktioniert', t.why, true) + f('hook · 0–2s', t.hook) + f('aufbau', t.format) + f('sound', t.sound)
+    + (t.prompt ? `<article class="term full"><header><b>trend.prompt</b><span>Beispiel für Clip 1</span></header><textarea readonly>${esc(t.prompt)}</textarea></article>` : '')
+    + `<div class="full hint">Ist als Vorlage gewählt. Trag unten deine Details ein (z. B. „2 Katzen, albanische Herkunft“), CZ baut den Rest im Stil des Trends.</div>`;
 }
 async function loadProjects(){
   try {
@@ -337,7 +403,7 @@ async function loadStatus(){
     $('ledLLM').className = 'led ' + (S.status.llm_ready ? 'on' : 'off');
     $('ledHF').className = 'led ' + (S.status.higgsfield_ready ? 'on' : 'off');
     fillSelect('style', S.status.styles, true); fillSelect('platform', S.status.platforms, true);
-    fillSelect('tone', S.status.tones, true); fillSelect('voice', S.status.voices, true);
+    fillSelect('tone', S.status.tones, true); updateVoices();
     fillSelect('llmProvider', S.status.llm_providers, false);
     if (S.status.llm_providers.includes(S.status.llm_provider)) $('llmProvider').value = S.status.llm_provider;
     $('hfModel').value = S.status.higgsfield_model;
@@ -361,6 +427,12 @@ $('sf').addEventListener('submit', async e => {
 });
 
 /* ---------- inputs ---------- */
+function updateVoices(){
+  const langs = S.status && S.status.languages; if (!langs) return;
+  const l = langs[$('lang').value] || langs.de; fillSelect('voice', l.voices, true);
+  $('subsLabel').textContent = ($('lang').value === 'en' ? 'Englische' : 'Deutsche') + ' Untertitel einblenden';
+}
+$('lang').addEventListener('change', () => { updateVoices(); saveDraft(); });
 function inputs(){
   const o = {}; FIELDS.forEach(k => o[k] = $(k).value.trim());
   o.len = +$('len').value; o.clip = S.clip; o.length = o.len; o.subs = $('subs').checked;
@@ -368,11 +440,13 @@ function inputs(){
   return o;
 }
 function setInputs(o){
+  if (o.lang) { $('lang').value = o.lang; updateVoices(); }
   FIELDS.forEach(k => { if (o[k] != null && $(k)) $(k).value = o[k]; });
   if (o.len) $('len').value = o.len; if (o.clip) S.clip = o.clip;
   $('subs').checked = o.subs !== false;
   S.pick = o.own ? 'own' : (o.trend ? S.trends.findIndex(t => t.name === o.trend.name) : null);
   if (S.pick === -1) S.pick = null;
+  updateVoices(); if (o.voice) $('voice').value = o.voice;
   drawTimeline(); renderTrends();
 }
 function saveDraft(){ try { localStorage.setItem('cz-draft', JSON.stringify(inputs())); } catch (e) {} }
@@ -462,7 +536,9 @@ function done(t){
 $('len').addEventListener('input', () => { drawTimeline(); saveDraft(); });
 $('presets').addEventListener('click', e => { const b = e.target.closest('[data-v]'); if (!b) return; $('len').value = b.dataset.v; drawTimeline(); saveDraft(); });
 $('clipchips').addEventListener('click', e => { const b = e.target.closest('[data-c]'); if (!b) return; S.clip = +b.dataset.c; drawTimeline(); saveDraft(); });
-$('trends').addEventListener('click', e => { const b = e.target.closest('[data-i]'); if (!b) return; S.pick = +b.dataset.i; renderTrends(); saveDraft(); });
+$('trends').addEventListener('click', e => { const b = e.target.closest('[data-i]'); if (!b) return; S.pick = +b.dataset.i; renderTrends(); showTrendDetail(S.pick); saveDraft(); $('trendCard').scrollIntoView({behavior:'smooth', block:'start'}); });
+$('own').addEventListener('click', () => { $('trendCard').hidden = true; });
+$('analyzeBtn').onclick = analyzeTrends;
 $('own').addEventListener('click', () => { S.pick = 'own'; renderTrends(); saveDraft(); $('idea').focus(); });
 $('f').addEventListener('input', saveDraft);
 $('f').addEventListener('submit', e => { e.preventDefault(); makePlan(); });
@@ -480,6 +556,26 @@ $('projects').addEventListener('click', async e => {
     try { await call('/cz/projects/' + encodeURIComponent(d.dataset.del), {method:'DELETE'}); loadProjects(); } catch (err) {} }
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') $('settings').hidden = true; if ((e.metaKey||e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); makePlan(); } });
+
+/* ---------- update ---------- */
+$('openUpdate').onclick = () => { $('update').hidden = false; };
+$('uClose').onclick = () => { $('update').hidden = true; };
+$('uRun').onclick = async () => {
+  $('uRun').disabled = true; setStatus('ustatus', 'hole neueste Version … (kann ein paar Minuten dauern)');
+  try {
+    const d = await call('/cz/update', {method:'POST'});
+    setStatus('ustatus', d.message);
+    if (d.changes && d.changes.length) { $('uChanges').hidden = false; $('uChanges').innerHTML = d.changes.map(c => `<li>${esc(c)}</li>`).join(''); }
+    if (d.updated) $('uRestart').hidden = false;
+  } catch (e) { setStatus('ustatus', e.message, true); }
+  finally { $('uRun').disabled = false; }
+};
+$('uRestart').onclick = async () => {
+  try { const d = await call('/cz/restart', {method:'POST'});
+    setStatus('ustatus', d.restarting ? 'CZ startet neu …' : 'Bitte CZ selbst schließen und neu öffnen.'); }
+  catch (e) { setStatus('ustatus', 'Bitte CZ selbst schließen und neu öffnen.'); }
+};
+document.addEventListener('keydown', e => { if (e.key === 'Escape') $('update').hidden = true; });
 
 drawTimeline();
 Promise.all([loadTrends(), loadStatus(), loadProjects()]);

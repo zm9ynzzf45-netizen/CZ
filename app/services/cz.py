@@ -33,6 +33,17 @@ GERMAN_VOICES = (
     "de-DE-AmalaNeural-Female",
     "de-DE-KillianNeural-Male",
 )
+ENGLISH_VOICES = (
+    "en-US-JennyNeural-Female",
+    "en-US-GuyNeural-Male",
+    "en-US-AriaNeural-Female",
+    "en-GB-RyanNeural-Male",
+)
+# Voice-over, subtitles and script follow the chosen language.
+LANGUAGES = {
+    "de": {"label": "Deutsch", "video_language": "de-DE", "voices": GERMAN_VOICES, "name": "deutscher", "words": "deutsche"},
+    "en": {"label": "Englisch", "video_language": "en-US", "voices": ENGLISH_VOICES, "name": "englischer", "words": "englische"},
+}
 
 STYLES = (
     "Fotorealistisch, Handyvideo-Look",
@@ -119,6 +130,7 @@ def status() -> dict:
         "higgsfield_model": config.app.get("higgsfield_model", "")
         or "kling-video/v2.5-turbo/pro/text-to-video",
         "voices": list(GERMAN_VOICES),
+        "languages": {k: {"label": v["label"], "voices": list(v["voices"])} for k, v in LANGUAGES.items()},
         "styles": list(STYLES),
         "platforms": list(PLATFORMS),
         "tones": list(TONES),
@@ -154,14 +166,22 @@ def clip_plan(total_seconds: int, clip_seconds: int) -> list[int]:
     return [clip] * count
 
 
+def _language(data: dict) -> dict:
+    return LANGUAGES.get(str(data.get("lang") or "de"), LANGUAGES["de"])
+
+
 def build_plan_prompt(data: dict) -> str:
     clips = clip_plan(data.get("length", 15), data.get("clip", 5))
+    lang = _language(data)
     trend = data.get("trend") or {}
     trend_line = (
         f'Trend-Vorlage (nur das FORMAT übernehmen, nie 1:1 kopieren): "{trend.get("name", "")}" – {trend.get("desc", "")}'
         if trend.get("name")
         else "Keine Trend-Vorlage: eigene Idee des Nutzers umsetzen."
     )
+    for key, label in (("hook", "Trend-Hook"), ("format", "Trend-Aufbau"), ("prompt", "Trend-Beispielprompt")):
+        if trend.get(key):
+            trend_line += f"\n{label}: {str(trend[key])[:600]}"
     return f"""Du bist Profi für virale KI-Kurzvideos ({data.get('platform', 'TikTok')}).
 
 AUFTRAG
@@ -175,13 +195,13 @@ Ton: {data.get('tone', TONES[0])}
 Gesamtlänge: {sum(clips)} Sekunden = {len(clips)} Clips à {clips[0]} s
 
 REGELN
-1. "script": deutscher Sprechertext, so lang, dass er ca. {sum(clips)} Sekunden dauert (ca. {int(sum(clips) * 2.3)} Wörter). Erster Satz ist der Hook (Sekunde 0-2), Ende mit Pointe oder Frage.
+1. "script": {lang["name"]} Sprechertext (Sprache: {lang["label"]}), so lang, dass er ca. {sum(clips)} Sekunden dauert (ca. {int(sum(clips) * 2.3)} Wörter). Erster Satz ist der Hook (Sekunde 0-2), Ende mit Pointe oder Frage.
 2. "clips": genau {len(clips)} englische Video-Prompts, einer pro Clip, in Story-Reihenfolge. Jeder Prompt: ein Absatz, max. 900 Zeichen, beginnt mit Stil-Block ({data.get('style', STYLES[0])}, vertical 9:16), dann identische Figurenbeschreibung in jedem Clip, eine klare Hauptaktion, Kamera-Begriffe (tracking shot, wide-angle 24mm, realistic physics). Clip 1 startet mit Action oder Extreme Close-up.
 3. Keine echten Marken, Logos, Prominenten oder Privatpersonen. Kein Blut. Jeder Prompt endet mit "No text, no logos, no watermark."
 4. Nische klar erkennbar, ohne andere Gruppen herabzusetzen.
 
 ANTWORT: nur gültiges JSON, ohne Markdown:
-{{"title":"kurzer deutscher Titel","hook":"was in Sekunde 0-2 passiert","script":"deutscher Sprechertext","clips":["english prompt clip 1"],"caption":"Post-Caption mit Emojis und Frage","hashtags":"#tag #tag"}}"""
+{{"title":"kurzer Titel","hook":"was in Sekunde 0-2 passiert (deutsch)","script":"{lang["name"]} Sprechertext","clips":["english prompt clip 1"],"caption":"Post-Caption in {lang["label"]} mit Emojis und Frage","hashtags":"#tag #tag"}}"""
 
 
 def parse_plan(text: str, expected_clips: int) -> dict:
@@ -223,9 +243,10 @@ def build_video_params(data: dict) -> TaskVideoRequest:
     if not script or not clips:
         raise ValueError("Plan braucht Sprechertext und mindestens einen Clip-Prompt")
     clip_seconds = int(data.get("clip", 5))
-    voice = str(data.get("voice") or GERMAN_VOICES[0])
-    if voice not in GERMAN_VOICES:
-        voice = GERMAN_VOICES[0]
+    lang = _language(data)
+    voice = str(data.get("voice") or lang["voices"][0])
+    if voice not in lang["voices"]:
+        voice = lang["voices"][0]
     return TaskVideoRequest(
         video_subject=str(plan.get("title") or data.get("niche") or "CZ Video")[:120],
         video_script=script,
@@ -235,7 +256,7 @@ def build_video_params(data: dict) -> TaskVideoRequest:
         video_clip_duration=max(1, min(clip_seconds, 15)),
         video_concat_mode="sequential",
         video_count=1,
-        video_language="de-DE",
+        video_language=lang["video_language"],
         voice_name=voice,
         subtitle_enabled=bool(data.get("subs", True)),
         subtitle_position="bottom",
@@ -299,3 +320,155 @@ def delete_project(project_id: str) -> None:
     path = os.path.join(_projects_dir(), f"{_safe_project_id(project_id)}.json")
     if os.path.exists(path):
         os.remove(path)
+
+
+# ---------------------------------------------------------------- trends ----
+
+TREND_COUNT = 10
+
+
+def build_trend_prompt(niche: str, platform: str) -> str:
+    return f"""Du bist Social-Media-Analyst für Kurzvideos auf TikTok und Instagram Reels.
+
+Erstelle eine Auswertung der {TREND_COUNT} stärksten aktuellen Kurzvideo-Trendformate,
+die sich für die Nische "{niche or 'allgemein / Comedy'}" eignen (Fokus: {platform or 'TikTok und Instagram Reels'}).
+Stütze dich auf dein Wissen über wiederkehrende virale Formate. Erfinde keine konkreten
+Aufrufzahlen, Accounts oder Links.
+
+Für jeden Trend:
+- "name": kurzer Name des Formats (deutsch)
+- "platform": "TikTok", "Instagram" oder "beide"
+- "status": "steigt", "neu" oder "stabil"
+- "score": Viral-Potenzial für diese Nische, ganze Zahl 1-10
+- "desc": 1 Satz, was in dem Format passiert
+- "why": 1-2 Sätze, warum es funktioniert (Psychologie, Hook, Wiederschauen)
+- "hook": was in Sekunde 0-2 passiert
+- "format": Aufbau/Schnitt in Stichpunkten, ein Satz
+- "sound": passende Sound-/Musik-Art
+- "prompt": englischer Video-Prompt für Clip 1 (vertical 9:16, max. 600 Zeichen,
+  endet mit "No text, no logos, no watermark.")
+
+Sortiere nach score absteigend. Antworte NUR mit gültigem JSON:
+{{"items":[{{"name":"","platform":"","status":"","score":8,"desc":"","why":"","hook":"","format":"","sound":"","prompt":""}}]}}"""
+
+
+TREND_FIELDS = ("name", "platform", "status", "desc", "why", "hook", "format", "sound", "prompt")
+
+
+def parse_trends(text: str) -> list[dict]:
+    start, end = text.find("{"), text.rfind("}")
+    if start < 0 or end < start:
+        raise ValueError("LLM returned no JSON trends")
+    raw = json.loads(text[start : end + 1]).get("items", [])
+    items = []
+    for item in raw if isinstance(raw, list) else []:
+        if not isinstance(item, dict) or not str(item.get("name", "")).strip():
+            continue
+        clean = {key: str(item.get(key, "")).strip()[:900] for key in TREND_FIELDS}
+        try:
+            clean["score"] = max(1, min(10, int(item.get("score", 5))))
+        except (TypeError, ValueError):
+            clean["score"] = 5
+        items.append(clean)
+    if not items:
+        raise ValueError("LLM returned no trends")
+    items.sort(key=lambda t: t["score"], reverse=True)
+    return items[:TREND_COUNT]
+
+
+def generate_trends(niche: str, platform: str = "") -> dict:
+    import datetime
+
+    from app.services import llm
+
+    items = parse_trends(llm._generate_response(build_trend_prompt(niche, platform)))
+    data = {
+        "items": items,
+        "updated": datetime.datetime.now().strftime("%d.%m.%Y %H:%M"),
+        "niche": str(niche)[:80],
+        "source": "KI-Einschätzung",
+    }
+    with _lock:
+        tmp = _trends_file() + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as handle:
+            json.dump(data, handle, ensure_ascii=False, indent=2)
+        os.replace(tmp, _trends_file())
+    logger.info(f"cz trends generated: niche={niche!r}, count={len(items)}")
+    return data
+
+
+# ---------------------------------------------------------------- update ----
+
+def _repo_dir() -> str:
+    return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+def _run(cmd: list[str], timeout: int = 900) -> tuple[int, str]:
+    import subprocess
+
+    result = subprocess.run(
+        cmd, cwd=_repo_dir(), capture_output=True, text=True, timeout=timeout
+    )
+    return result.returncode, (result.stdout + result.stderr).strip()
+
+
+def _uv_binary() -> str:
+    import shutil
+
+    found = shutil.which("uv")
+    if found:
+        return found
+    candidate = os.path.expanduser("~/.local/bin/uv")
+    if os.path.exists(candidate):
+        return candidate
+    raise RuntimeError("uv wurde nicht gefunden")
+
+
+def run_update() -> dict:
+    """Fetch the newest CZ version from GitHub and install its packages."""
+    code, dirty = _run(["git", "status", "--porcelain", "--untracked-files=no"])
+    if code != 0:
+        raise RuntimeError(f"git status fehlgeschlagen: {dirty[-400:]}")
+    if dirty:
+        raise RuntimeError(
+            "Es gibt lokale Änderungen an CZ-Dateien. Update abgebrochen, damit nichts verloren geht."
+        )
+    _, before = _run(["git", "rev-parse", "--short", "HEAD"])
+    code, out = _run(["git", "pull", "--ff-only"])
+    if code != 0:
+        raise RuntimeError(f"Update von GitHub fehlgeschlagen: {out[-600:]}")
+    _, after = _run(["git", "rev-parse", "--short", "HEAD"])
+    if before == after:
+        return {"updated": False, "version": after, "message": "CZ ist schon aktuell."}
+    code, out = _run([_uv_binary(), "sync", "--frozen"])
+    if code != 0:
+        raise RuntimeError(f"Pakete konnten nicht installiert werden: {out[-600:]}")
+    _, log = _run(["git", "log", "--format=%s", f"{before}..{after}"])
+    return {
+        "updated": True,
+        "version": after,
+        "changes": [line for line in log.splitlines() if line][:20],
+        "message": "Update installiert. Bitte CZ neu starten.",
+    }
+
+
+def restart_app() -> bool:
+    """Relaunch CZ.app (desktop mode only). Returns False in browser mode."""
+    import subprocess
+
+    app_path = os.environ.get("CZ_APP_PATH", "")
+    if not app_path or not os.path.isdir(app_path):
+        return False
+    subprocess.Popen(
+        ["/bin/sh", "-c", 'sleep 2; open -n "$0"', app_path],
+        start_new_session=True,
+    )
+
+    def _quit():
+        import time
+
+        time.sleep(1)
+        os._exit(0)
+
+    threading.Thread(target=_quit, daemon=True).start()
+    return True

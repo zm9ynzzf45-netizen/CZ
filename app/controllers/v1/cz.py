@@ -85,3 +85,29 @@ def cz_delete_project(request: Request, project_id: str):
     except ValueError as error:
         _bad_request(request, error)
     return utils.get_response(200, {"deleted": project_id})
+
+
+@router.post("/cz/trends/analyze", summary="Let the text model rank 10 trend formats")
+def cz_analyze_trends(request: Request, body: dict = Body(...)):
+    try:
+        return utils.get_response(
+            200,
+            cz_service.generate_trends(
+                str(body.get("niche", "")).strip(), str(body.get("platform", "")).strip()
+            ),
+        )
+    except ValueError as error:
+        _bad_request(request, error)
+
+
+@router.post("/cz/update", summary="Pull the newest CZ version from GitHub")
+def cz_update(request: Request):
+    try:
+        return utils.get_response(200, cz_service.run_update())
+    except (RuntimeError, OSError) as error:
+        _bad_request(request, error)
+
+
+@router.post("/cz/restart", summary="Restart the CZ desktop app")
+def cz_restart():
+    return utils.get_response(200, {"restarting": cz_service.restart_app()})
