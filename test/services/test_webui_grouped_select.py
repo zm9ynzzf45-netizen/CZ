@@ -198,6 +198,7 @@ def test_grouped_video_source_keeps_groups_and_accessible_label_binding():
             "volcengine_seedance",
             "infistar",
             "jalapeno",
+            "higgsfield",
             "wavespeed",
             "muapi",
             "useapi",

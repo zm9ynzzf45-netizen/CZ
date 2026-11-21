@@ -145,6 +145,7 @@ VIDEO_SOURCE_GROUPS = {
         "volcengine_seedance",
         "infistar",
         "jalapeno",
+        "higgsfield",
         "wavespeed",
         "muapi",
         "useapi",
@@ -777,6 +778,7 @@ def _initialize_session_state():
         # 填入推荐素材数；消费后即清空，避免覆盖用户后续手动调整。
         "loomloom_video_scene_autofill_digest": "",
         "wavespeed_confirm_charge": False,
+        "higgsfield_confirm_charge": False,
         "volcengine_seedance_confirm_charge": False,
         "infistar_confirm_charge": False,
         "jalapeno_confirm_charge": False,
@@ -3435,6 +3437,7 @@ def _material_provider_labels():
         "volcengine_seedance": tr("Volcano Engine Seedance"),
         "infistar": tr("Infistar AI Video"),
         "jalapeno": tr("Jalapeno Cloud AI Video"),
+        "higgsfield": tr("Higgsfield AI Video"),
         "wavespeed": tr("WaveSpeed AI Video"),
         "muapi": tr("MuAPI AI Video"),
         "useapi": tr("useapi.net AI Video"),
@@ -4010,6 +4013,18 @@ def _render_material_provider_settings(provider):
         )
     elif provider == "jalapeno":
         _render_jalapeno_provider_settings()
+    elif provider == "higgsfield":
+        higgsfield_api_key = _get_material_api_keys("higgsfield_api_keys")
+        st.markdown("**Higgsfield**")
+        higgsfield_api_key = st.text_input(
+            tr("Higgsfield API Key"),
+            value=higgsfield_api_key,
+            type="password",
+            key="higgsfield_api_keys_input",
+            on_change=_save_settings_api_keys,
+            args=("higgsfield_api_keys", "higgsfield_api_keys_input"),
+        )
+        _save_material_api_keys("higgsfield_api_keys", higgsfield_api_key)
     elif provider == "wavespeed":
         wavespeed_api_key = _get_material_api_keys("wavespeed_api_keys")
         st.markdown("**WaveSpeed**")
@@ -6208,6 +6223,8 @@ def _render_video_settings(panel, params):
                 ))
             if params.video_source == "wavespeed":
                 st.caption(tr("WaveSpeed AI Video Help"))
+            if params.video_source == "higgsfield":
+                st.caption(tr("Higgsfield AI Video Help"))
             if params.video_source == "volcengine_seedance":
                 st.caption(tr("Volcano Engine Seedance Help"))
             if params.video_source == "ofox":
@@ -6532,6 +6549,8 @@ def _render_video_settings(panel, params):
 
             if params.video_source == "wavespeed":
                 _render_wavespeed_video_settings(params)
+            if params.video_source == "higgsfield":
+                _render_wavespeed_video_settings(params, provider="higgsfield")
             if params.video_source == "volcengine_seedance":
                 _render_seedance_video_settings(params)
             if params.video_source == "infistar":
@@ -6561,7 +6580,7 @@ def _render_video_settings(panel, params):
     return uploaded_files
 
 
-def _render_wavespeed_video_settings(params):
+def _render_wavespeed_video_settings(params, provider="wavespeed"):
     """
     渲染 WaveSpeed 生成数量估算与计费确认。
 
@@ -6570,6 +6589,7 @@ def _render_wavespeed_video_settings(params):
     本身按需逐段生成、凑够所需时长即停，因此实际生成数以运行时为准，
     估算只用于量级提示，不参与任务执行。
     """
+    label = "Higgsfield" if provider == "higgsfield" else "WaveSpeed"
     clip_duration = max(int(params.video_clip_duration or 1), 1)
     video_count = max(int(params.video_count or 1), 1)
     estimated_range = _estimate_voiceover_duration_range(
@@ -6582,14 +6602,14 @@ def _render_wavespeed_video_settings(params):
             math.ceil(estimated_range[1] * video_count / clip_duration), min_clips
         )
         st.warning(
-            tr("WaveSpeed Billing Notice").format(min=min_clips, max=max_clips)
+            tr(f"{label} Billing Notice").format(min=min_clips, max=max_clips)
         )
     else:
-        st.warning(tr("WaveSpeed Billing Notice Without Script"))
+        st.warning(tr(f"{label} Billing Notice Without Script"))
     st.checkbox(
-        tr("Confirm WaveSpeed Charge"),
-        key="wavespeed_confirm_charge",
-        help=tr("Confirm WaveSpeed Charge Help"),
+        tr(f"Confirm {label} Charge"),
+        key=f"{provider}_confirm_charge",
+        help=tr(f"Confirm {label} Charge Help"),
     )
 
 
@@ -9358,6 +9378,22 @@ def _render_generation_controls(
                 _remove_active_generation_task(task_id)
                 st.error(tr("Confirm Aigei Charge Required"))
                 st.stop()
+
+        if params.video_source == "higgsfield" and not (
+            config.app.get("higgsfield_api_keys", "")
+            or os.getenv("HF_KEY")
+            or (os.getenv("HF_API_KEY") and os.getenv("HF_API_SECRET"))
+        ):
+            _remove_active_generation_task(task_id)
+            st.error(tr("Please Enter the Higgsfield API Key"))
+            st.stop()
+
+        if params.video_source == "higgsfield" and not st.session_state.get(
+            "higgsfield_confirm_charge", False
+        ):
+            _remove_active_generation_task(task_id)
+            st.error(tr("Confirm Higgsfield Charge Required"))
+            st.stop()
 
         if params.video_source == "wavespeed" and not config.app.get(
             "wavespeed_api_keys", ""

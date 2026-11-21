@@ -1155,6 +1155,324 @@ def _wait_for_wavespeed_prediction(
         time.sleep(WAVESPEED_POLL_INTERVAL_SECONDS)
 
 
+# Higgsfield (https://higgsfield.ai) generates brand-new clips through its
+# REST API (https://docs.higgsfield.ai). It shares the WaveSpeed on-demand
+# flow: one paid request per script segment, stop as soon as the voice-over
+# is covered, never resubmit a request whose state is unknown.
+HIGGSFIELD_API_BASE_URL = "https://api.higgsfield.ai"
+HIGGSFIELD_DEFAULT_T2V_MODEL = "kling-video/v2.5-turbo/pro/text-to-video"
+# Allowed durations of the default model. Other models accept other values,
+# so they can be changed with `higgsfield_durations` in config.toml.
+HIGGSFIELD_DEFAULT_DURATIONS = (5, 10)
+HIGGSFIELD_POLL_INTERVAL_SECONDS = 3.0
+HIGGSFIELD_RUN_TIMEOUT_SECONDS = 900.0
+HIGGSFIELD_FAILURE_STATUSES = frozenset({"failed", "nsfw", "canceled", "cancelled"})
+HIGGSFIELD_PENDING_STATUSES = frozenset({"queued", "in_progress"})
+
+
+class HiggsfieldUnconfirmedTaskError(WaveSpeedUnconfirmedTaskError):
+    """A paid Higgsfield request was submitted but its final state is unknown."""
+
+
+class HiggsfieldDownloadError(WaveSpeedDownloadError):
+    """A paid Higgsfield request completed, but its video could not be saved."""
+
+
+def _higgsfield_credentials() -> str:
+    """
+    Return the "KEY_ID:KEY_SECRET" credential.
+
+    config.toml `higgsfield_api_keys` wins; otherwise the environment variables
+    used by the official SDK (HF_KEY, or HF_API_KEY + HF_API_SECRET).
+    """
+    if config.app.get("higgsfield_api_keys"):
+        return str(get_api_key("higgsfield_api_keys")).strip()
+    key = os.getenv("HF_KEY", "").strip()
+    if key:
+        return key
+    key_id = os.getenv("HF_API_KEY", "").strip()
+    secret = os.getenv("HF_API_SECRET", "").strip()
+    if key_id and secret:
+        return f"{key_id}:{secret}"
+    raise ValueError(
+        "\n\n##### higgsfield_api_keys is not set #####\n\n"
+        "Set it in config.toml as \"KEY_ID:KEY_SECRET\" "
+        f"({config.config_file}), or set HF_KEY.\n"
+    )
+
+
+def _higgsfield_durations() -> list[int]:
+    raw = config.app.get("higgsfield_durations", HIGGSFIELD_DEFAULT_DURATIONS)
+    if isinstance(raw, (int, float, str)):
+        raw = [raw]
+    values: set[int] = set()
+    for value in raw if isinstance(raw, (list, tuple)) else []:
+        try:
+            number = int(value)
+        except (TypeError, ValueError):
+            continue
+        if number >= 1:
+            values.add(number)
+    return sorted(values) or list(HIGGSFIELD_DEFAULT_DURATIONS)
+
+
+def _higgsfield_pick_duration(requested: int) -> int:
+    """Smallest allowed duration that covers the request, else the longest."""
+    allowed = _higgsfield_durations()
+    for value in allowed:
+        if value >= requested:
+            return value
+    return allowed[-1]
+
+
+def _higgsfield_bool(key: str, default: bool) -> bool:
+    value = config.app.get(key, default)
+    if isinstance(value, str):
+        return value.strip().lower() not in ("0", "false", "no", "off", "")
+    return bool(value)
+
+
+def build_higgsfield_payload(
+    prompt: str, duration: int, video_aspect: VideoAspect
+) -> dict:
+    payload: dict[str, Any] = {"prompt": prompt, "duration": duration}
+    negative = str(config.app.get("higgsfield_negative_prompt", "") or "").strip()
+    if negative:
+        payload["negative_prompt"] = negative
+    # The default Kling endpoint has no aspect_ratio field and rejects unknown
+    # ones, so it is only sent for models that accept it.
+    if _higgsfield_bool("higgsfield_send_aspect_ratio", False):
+        payload["aspect_ratio"] = VideoAspect(video_aspect).value
+    extra = config.app.get("higgsfield_extra_params", {})
+    if isinstance(extra, dict):
+        for key, value in extra.items():
+            payload.setdefault(str(key), value)
+    return payload
+
+
+def extract_higgsfield_video_urls(data: dict) -> list[str]:
+    urls: list[str] = []
+    video = data.get("video")
+    if isinstance(video, dict) and isinstance(video.get("url"), str):
+        urls.append(video["url"])
+    videos = data.get("videos")
+    for item in videos if isinstance(videos, list) else []:
+        if isinstance(item, dict) and isinstance(item.get("url"), str):
+            urls.append(item["url"])
+    seen: set[str] = set()
+    return [
+        u for u in urls
+        if u.startswith(("http://", "https://")) and not (u in seen or seen.add(u))
+    ]
+
+
+def generate_videos_higgsfield(
+    search_term: str,
+    minimum_duration: int,
+    video_aspect: VideoAspect = VideoAspect.portrait,
+) -> List[MaterialInfo]:
+    """
+    Generate one clip for one script segment on Higgsfield.
+
+    Same signature and empty-list-on-clear-failure contract as
+    ``generate_videos_wavespeed``.
+    """
+    aspect = VideoAspect(video_aspect)
+    video_width, video_height = aspect.to_resolution()
+    credentials = _higgsfield_credentials()
+    model_id = (
+        str(config.app.get("higgsfield_model", "") or HIGGSFIELD_DEFAULT_T2V_MODEL)
+        .strip()
+        .strip("/")
+    )
+    headers = {
+        "Authorization": f"Key {credentials}",
+        "Content-Type": "application/json",
+        # Lets a timed-out submission be retried by Higgsfield without a
+        # duplicate charge; we still never resubmit ourselves.
+        "Idempotency-Key": str(uuid.uuid4()),
+    }
+    requested_duration = max(int(minimum_duration), 1)
+    duration = _higgsfield_pick_duration(requested_duration)
+    payload = build_higgsfield_payload(search_term, duration, aspect)
+    logger.info(
+        f"generating video on higgsfield: model={model_id}, "
+        f"term={search_term!r}, duration={duration}s"
+    )
+
+    generation_progress.submitting("higgsfield")
+    try:
+        response = trace_http_call(
+            "POST", requests.post,
+            f"{HIGGSFIELD_API_BASE_URL}/{model_id}",
+            json=payload,
+            headers=headers,
+            proxies=config.proxy,
+            verify=_get_tls_verify(),
+            timeout=(30, 60),
+        )
+    except Exception as e:
+        raise HiggsfieldUnconfirmedTaskError(
+            "higgsfield submission did not return a response, the request may "
+            "already exist remotely: "
+            f"error={type(e).__name__}, detail={_redact_request_error(e, credentials)}"
+        ) from e
+
+    status_code = _wavespeed_status_code(response)
+    if status_code >= 500:
+        raise HiggsfieldUnconfirmedTaskError(
+            f"higgsfield submission failed with HTTP {status_code}, "
+            "the request may already exist remotely"
+        )
+    try:
+        body = response.json()
+    except Exception as e:
+        if 400 <= status_code < 500:
+            logger.error(
+                "higgsfield video generation request rejected: "
+                f"http_status={status_code}, unreadable body: {type(e).__name__}"
+            )
+            return []
+        raise HiggsfieldUnconfirmedTaskError(
+            "higgsfield submission returned an unreadable response, the request "
+            f"may already exist remotely: error={type(e).__name__}"
+        ) from e
+
+    if status_code >= 400 or not isinstance(body, dict):
+        # 4xx (bad credentials 401, no balance, invalid parameters 422, model
+        # unavailable 404/423) is a clear rejection: nothing was created.
+        detail = body.get("detail") if isinstance(body, dict) else body
+        logger.error(
+            "higgsfield video generation request rejected: "
+            f"http_status={status_code}, "
+            f"detail={_redact_secret(str(detail or '')[:500], credentials)}"
+        )
+        return []
+    request_id = str(body.get("request_id") or "").strip()
+    if not request_id:
+        raise HiggsfieldUnconfirmedTaskError(
+            "higgsfield accepted the submission without returning a request id"
+        )
+    logger.info(f"higgsfield request created: id={request_id}")
+    status_url = str(body.get("status_url") or "").strip() or (
+        f"{HIGGSFIELD_API_BASE_URL}/requests/{request_id}/status"
+    )
+
+    result = _wait_for_higgsfield_request(
+        request_id=request_id,
+        status_url=status_url,
+        headers={"Authorization": headers["Authorization"]},
+        credentials=credentials,
+    )
+    if result is None:
+        return []
+
+    items = []
+    for url in extract_higgsfield_video_urls(result):
+        item = MaterialInfo()
+        item.provider = "higgsfield"
+        item.url = url
+        item.duration = duration
+        item.source_info = {
+            "provider": "higgsfield",
+            "search_term": search_term,
+            "asset_id": request_id,
+            "rendition": {"id": None, "width": video_width, "height": video_height},
+        }
+        items.append(item)
+    if not items:
+        logger.error(
+            f"higgsfield request completed without a video url: id={request_id}"
+        )
+    return items
+
+
+def _wait_for_higgsfield_request(
+    *,
+    request_id: str,
+    status_url: str,
+    headers: dict,
+    credentials: str,
+) -> dict | None:
+    """
+    Poll one request until it is terminal. Returns the completed payload,
+    None on a clear remote failure, and raises HiggsfieldUnconfirmedTaskError
+    when the state cannot be confirmed.
+    """
+    deadline = time.monotonic() + HIGGSFIELD_RUN_TIMEOUT_SECONDS
+    generation_progress.remote("higgsfield", request_id)
+    consecutive_failures = 0
+    while True:
+        try:
+            response = trace_http_call(
+                "GET", requests.get,
+                status_url,
+                headers=headers,
+                proxies=config.proxy,
+                verify=_get_tls_verify(),
+                timeout=(30, 60),
+            )
+            code = _wavespeed_status_code(response)
+            if code in WAVESPEED_RETRYABLE_STATUS_CODES:
+                raise requests.exceptions.HTTPError(f"HTTP {code}", response=response)
+            data = response.json()
+            if code >= 400 or not isinstance(data, dict):
+                raise HiggsfieldUnconfirmedTaskError(
+                    f"higgsfield request status is unknown: http_status={code}",
+                    prediction_id=request_id,
+                )
+        except HiggsfieldUnconfirmedTaskError:
+            raise
+        except Exception as e:
+            if not _is_wavespeed_retryable_error(e):
+                raise HiggsfieldUnconfirmedTaskError(
+                    "higgsfield polling failed and the request state is unknown: "
+                    f"error={type(e).__name__}, "
+                    f"detail={_redact_request_error(e, credentials)}",
+                    prediction_id=request_id,
+                ) from e
+            consecutive_failures += 1
+            generation_progress.remote("higgsfield", request_id, retrying=True)
+            if consecutive_failures > WAVESPEED_MAX_POLL_RETRIES:
+                raise HiggsfieldUnconfirmedTaskError(
+                    "higgsfield polling failed repeatedly, the request may still "
+                    f"be running remotely: error={type(e).__name__}",
+                    prediction_id=request_id,
+                ) from e
+            delay = WAVESPEED_RETRY_BASE_SECONDS * consecutive_failures
+            logger.warning(
+                "higgsfield polling hit a transient error, retry the same request: "
+                f"id={request_id}, attempt={consecutive_failures}, retry_in={delay:.1f}s"
+            )
+            time.sleep(delay)
+            continue
+
+        consecutive_failures = 0
+        status = str(data.get("status") or "").lower()
+        generation_progress.remote("higgsfield", request_id, status)
+        if status == "completed":
+            return data
+        if status in HIGGSFIELD_FAILURE_STATUSES:
+            logger.error(
+                "higgsfield request did not produce a video: "
+                f"id={request_id}, status={status}, "
+                f"detail={_redact_secret(str(data.get('error') or '')[:500], credentials)}"
+            )
+            return None
+        if status not in HIGGSFIELD_PENDING_STATUSES:
+            raise HiggsfieldUnconfirmedTaskError(
+                f"higgsfield returned an unknown status: {status!r}",
+                prediction_id=request_id,
+            )
+        if time.monotonic() > deadline:
+            raise HiggsfieldUnconfirmedTaskError(
+                f"higgsfield request is still {status} after "
+                f"{HIGGSFIELD_RUN_TIMEOUT_SECONDS:.0f}s of local waiting",
+                prediction_id=request_id,
+            )
+        time.sleep(HIGGSFIELD_POLL_INTERVAL_SECONDS)
+
+
 def _save_generated_video_with_retry(
     video_url: str,
     save_dir: str,
@@ -2650,6 +2968,16 @@ def download_videos(
             task_id=task_id, search_terms=search_terms, video_aspect=video_aspect,
             audio_duration=audio_duration, max_clip_duration=max_clip_duration,
         )
+    if source == "higgsfield":
+        return _download_videos_wavespeed_on_demand(
+            task_id=task_id,
+            search_terms=search_terms,
+            video_aspect=video_aspect,
+            audio_duration=audio_duration,
+            max_clip_duration=max_clip_duration,
+            material_directory=material_directory,
+            provider="higgsfield",
+        )
     if source == "wavespeed":
         # AI 生成按条计费，不能沿用库存源"先为全部关键词取回候选、再挑选"
         # 的流程，否则会为用不到的片段付费。生成源改为逐段按需生成，凑够
@@ -2868,6 +3196,7 @@ def _download_videos_wavespeed_on_demand(
     audio_duration: float,
     max_clip_duration: int,
     material_directory: str,
+    provider: str = "wavespeed",
 ) -> List[str]:
     """
     按脚本片段顺序逐段生成 WaveSpeed 素材，凑够所需总时长立即停止。
@@ -2905,7 +3234,12 @@ def _download_videos_wavespeed_on_demand(
     total_duration = 0.0
     for search_term in search_terms:
         try:
-            video_items = generate_videos_wavespeed(
+            generate = (
+                generate_videos_higgsfield
+                if provider == "higgsfield"
+                else generate_videos_wavespeed
+            )
+            video_items = generate(
                 search_term=search_term,
                 minimum_duration=clip_duration,
                 video_aspect=video_aspect,
@@ -2915,7 +3249,7 @@ def _download_videos_wavespeed_on_demand(
             # 继续为后续关键词下单会造成重复生成和重复扣费，因此就地停止，
             # 把 prediction id 交给任务层写入失败状态，供用户找回产物。
             logger.error(
-                "stop submitting new wavespeed tasks, the last submitted task "
+                f"stop submitting new {provider} tasks, the last submitted task "
                 f"is unconfirmed: prediction_id={e.prediction_id or 'unknown'}, "
                 f"detail={e}"
             )
@@ -2923,7 +3257,7 @@ def _download_videos_wavespeed_on_demand(
             raise
         for item in video_items:
             saved_video_path = _save_generated_video_with_retry(
-                item.url, material_directory, "wavespeed"
+                item.url, material_directory, provider
             )
             if not saved_video_path:
                 source_info = (
@@ -2931,8 +3265,13 @@ def _download_videos_wavespeed_on_demand(
                 )
                 prediction_id = str(source_info.get("asset_id") or "").strip()
                 _persist_material_sources(task_id, material_sources)
-                raise WaveSpeedDownloadError(
-                    "WaveSpeed generated a paid video but the result could not be "
+                download_error = (
+                    HiggsfieldDownloadError
+                    if provider == "higgsfield"
+                    else WaveSpeedDownloadError
+                )
+                raise download_error(
+                    f"{provider} generated a paid video but the result could not be "
                     f"downloaded: id={prediction_id or 'unknown'}",
                     prediction_id=prediction_id,
                 )

@@ -101,7 +101,7 @@ _VIDEO_MUSIC_PROVIDERS = {
 
 
 _SUPPORTED_VIDEO_SOURCES = frozenset({
-    "pexels", "pixabay", "coverr", "aigei", "local", "wavespeed",
+    "pexels", "pixabay", "coverr", "aigei", "local", "wavespeed", "higgsfield",
     "volcengine_seedance", "ofox", "metaso_minimax", "muapi", "useapi",
     "loomloom", "openai_image", "codex_image", "useapi_image", "infistar",
     "jalapeno",
@@ -877,7 +877,15 @@ def get_video_materials(
             # leave its ID in task state. Earlier successful clips cannot turn
             # this incomplete run into an apparently completed video task.
             prediction_id = str(getattr(exc, "prediction_id", "") or "").strip()
-            details = {"wavespeed_prediction_id": prediction_id} if prediction_id else None
+            id_key = (
+                "higgsfield_request_id"
+                if isinstance(exc, (
+                    material.HiggsfieldUnconfirmedTaskError,
+                    material.HiggsfieldDownloadError,
+                ))
+                else "wavespeed_prediction_id"
+            )
+            details = {id_key: prediction_id} if prediction_id else None
             _mark_task_failed(task_id, "materials", str(exc), details=details)
             return None
         except material.OpenAIImagePaidResultError as exc:

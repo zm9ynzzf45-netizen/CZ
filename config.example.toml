@@ -88,7 +88,7 @@ tls_verify = true
 # Video Materials / 视频素材
 # -----------------------------------------------------------------------------
 
-# Available values: "pexels", "pixabay", "coverr", "aigei", "wavespeed",
+# Available values: "pexels", "pixabay", "coverr", "aigei", "wavespeed", "higgsfield",
 # "volcengine_seedance", "ofox", "metaso_minimax", "muapi", "useapi",
 # "loomloom", "openai_image", "useapi_image", "infistar", "local".
 # "wavespeed" generates brand-new clips with WaveSpeed AI text-to-video models
@@ -125,6 +125,24 @@ aigei_api_key = ""
 # WaveSpeed AI generates clips from your script keywords with text-to-video
 # models. Create an API key at https://wavespeed.ai
 wavespeed_api_keys = []
+
+# Higgsfield (https://higgsfield.ai) generates new clips with its video models.
+# Create a key at https://console.higgsfield.ai and enter it as
+# "KEY_ID:KEY_SECRET" (or set the HF_KEY environment variable instead).
+# Every clip is billed from the Higgsfield API balance.
+higgsfield_api_keys = ""
+# Model endpoint ID from the Higgsfield docs, e.g.
+# "kling-video/v2.5-turbo/pro/text-to-video" (default, 5 or 10 s, no aspect ratio)
+# "minimax/hailuo-2.3/standard/text-to-video" (6 or 10 s)
+# higgsfield_model = "kling-video/v2.5-turbo/pro/text-to-video"
+# Durations the chosen model accepts; a clip uses the smallest value that
+# covers the clip length.
+# higgsfield_durations = [5, 10]
+# Send aspect_ratio (9:16 etc.) only for models that accept it.
+# higgsfield_send_aspect_ratio = false
+# higgsfield_negative_prompt = "logos, watermark, text, blood"
+# Extra model parameters passed unchanged, e.g. { cfg_scale = 0.5 }
+# higgsfield_extra_params = {}
 # Optional. Any WaveSpeed text-to-video model id that accepts
 # prompt / aspect_ratio / duration works here.
 # wavespeed_text_to_video_model = "bytedance/seedance-2.0-fast/text-to-video"

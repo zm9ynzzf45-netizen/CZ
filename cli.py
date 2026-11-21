@@ -43,6 +43,7 @@ _CLI_VIDEO_SOURCES = (
     "coverr",
     "aigei",
     "wavespeed",
+    "higgsfield",
     "volcengine_seedance",
     "ofox",
     "infistar",
@@ -388,6 +389,14 @@ Batch manifests:
         "--confirm-aigei-charge",
         action="store_true",
         help="allow Aigei to charge copper coins for stock video downloads",
+    )
+    material_group.add_argument(
+        "--confirm-higgsfield-charge",
+        action="store_true",
+        help=(
+            "confirm that Higgsfield video generation creates paid requests; "
+            "required with --video-source higgsfield for materials or video output"
+        ),
     )
     material_group.add_argument(
         "--confirm-wavespeed-charge",
@@ -784,6 +793,16 @@ Batch manifests:
         and stage_requires_materials and not args.confirm_aigei_charge
     ):
         parser.error("--confirm-aigei-charge is required with --video-source aigei")
+    if (
+        not args.batch_file
+        and args.video_source == "higgsfield"
+        and stage_requires_materials
+        and not args.confirm_higgsfield_charge
+    ):
+        parser.error(
+            "--confirm-higgsfield-charge is required with "
+            "--video-source higgsfield"
+        )
     if (
         not args.batch_file
         and args.video_source == "wavespeed"
@@ -1260,6 +1279,7 @@ def _validate_batch_task_params(
     custom_position_is_explicit: bool,
     wavespeed_charge_confirmed: bool,
     seedance_charge_confirmed: bool,
+    higgsfield_charge_confirmed: bool = False,
     ofox_charge_confirmed: bool,
     metaso_minimax_charge_confirmed: bool,
     muapi_charge_confirmed: bool,
@@ -1304,6 +1324,14 @@ def _validate_batch_task_params(
         and not aigei_charge_confirmed
     ):
         raise ValueError("--confirm-aigei-charge is required with video_source=aigei")
+    if (
+        params.video_source == "higgsfield"
+        and stop_at in {"materials", "video"}
+        and not higgsfield_charge_confirmed
+    ):
+        raise ValueError(
+            "--confirm-higgsfield-charge is required for Higgsfield video generation"
+        )
     if (
         params.video_source == "wavespeed"
         and stop_at in {"materials", "video"}
@@ -1473,6 +1501,7 @@ def _build_batch_tasks(args: argparse.Namespace) -> list[VideoParams]:
                 ),
                 seedance_charge_confirmed=args.confirm_seedance_charge,
                 wavespeed_charge_confirmed=args.confirm_wavespeed_charge,
+                higgsfield_charge_confirmed=args.confirm_higgsfield_charge,
                 ofox_charge_confirmed=args.confirm_ofox_charge,
                 metaso_minimax_charge_confirmed=(
                     args.confirm_metaso_minimax_charge
