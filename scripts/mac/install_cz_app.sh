@@ -19,62 +19,21 @@ cd "$REPO_DIR"
 uv sync --frozen
 
 echo "==> Lege die App CZ in ~/Applications an ..."
+rm -rf "$APP_DIR"
 mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
+cp "$REPO_DIR/resource/cz/CZ.icns" "$APP_DIR/Contents/Resources/CZ.icns"
 
-cat > "$APP_DIR/Contents/Resources/start-cz.command" <<CMD
-#!/usr/bin/env bash
-# Startet CZ. Dieses Fenster offen lassen, solange du mit CZ arbeitest.
-export PATH="\$HOME/.local/bin:\$PATH"
-export STREAMLIT_SERVER_HEADLESS=true
-REPO_DIR="$REPO_DIR"
-LOG="\$REPO_DIR/storage/cz-webui.log"
-URL_FILE="\$REPO_DIR/storage/cz-url"
-mkdir -p "\$REPO_DIR/storage"
-cd "\$REPO_DIR"
-echo "CZ startet ... bitte kurz warten."
-echo "Zum Beenden dieses Fenster schließen."
-# CZ Studio (eigene Oberfläche) läuft auf dem API-Server, nur lokal erreichbar.
-PORT=\$(uv run --frozen python -c 'import socket
-for p in range(8080, 8180):
-    s = socket.socket()
-    try:
-        s.bind(("127.0.0.1", p)); print(p); break
-    except OSError:
-        pass
-    finally:
-        s.close()')
-echo "***** CZ address: http://127.0.0.1:\$PORT/cz/ *****" > "\$LOG"
-uv run --frozen uvicorn app.asgi:app --host 127.0.0.1 --port "\$PORT" >> "\$LOG" 2>&1 &
-SERVER_PID=\$!
-trap 'kill \$SERVER_PID 2>/dev/null; rm -f "\$URL_FILE"' EXIT
-URL=""
-for i in \$(seq 1 120); do
-  URL=\$(grep -o 'http://127.0.0.1:[0-9]*/cz/' "\$LOG" | head -1)
-  if [ -n "\$URL" ] && curl -s -o /dev/null "\$URL"; then break; fi
-  if ! kill -0 \$SERVER_PID 2>/dev/null; then echo "CZ konnte nicht starten:"; tail -20 "\$LOG"; read -r -p "Enter zum Schließen"; exit 1; fi
-  sleep 1
-done
-echo "\$URL" > "\$URL_FILE"
-echo "CZ läuft: \$URL"
-# Chrome bevorzugen: ältere Safari-Versionen (macOS 13) zeigen die Oberfläche leer an.
-if [ -d "/Applications/Google Chrome.app" ]; then
-  open -a "Google Chrome" "\$URL"
-else
-  open "\$URL"
-fi
-tail -f "\$LOG"
-CMD
-chmod +x "$APP_DIR/Contents/Resources/start-cz.command"
-
+# Startet CZ im eigenen Fenster (scripts/mac/cz_desktop.py), ohne Terminal und Browser.
 cat > "$APP_DIR/Contents/MacOS/CZ" <<LAUNCH
 #!/usr/bin/env bash
-HERE="\$(cd "\$(dirname "\$0")/.." && pwd)"
-URL_FILE="$REPO_DIR/storage/cz-url"
-# Läuft CZ schon? Dann nur den Browser öffnen.
-if [ -f "\$URL_FILE" ] && curl -s -o /dev/null "\$(cat "\$URL_FILE")"; then
-  if [ -d "/Applications/Google Chrome.app" ]; then open -a "Google Chrome" "\$(cat "\$URL_FILE")"; else open "\$(cat "\$URL_FILE")"; fi
-else
-  open -a Terminal "\$HERE/Resources/start-cz.command"
+export PATH="\$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+REPO_DIR="$REPO_DIR"
+LOG="\$REPO_DIR/storage/cz-app.log"
+mkdir -p "\$REPO_DIR/storage"
+cd "\$REPO_DIR"
+echo "=== CZ Start \$(date) ===" > "\$LOG"
+if ! uv run --frozen python scripts/mac/cz_desktop.py >> "\$LOG" 2>&1; then
+  osascript -e 'display dialog "CZ konnte nicht starten. Details stehen in ~/cz/storage/cz-app.log – schick sie Claude." buttons {"OK"} default button 1 with icon caution with title "CZ"' >/dev/null 2>&1
 fi
 LAUNCH
 chmod +x "$APP_DIR/Contents/MacOS/CZ"
@@ -88,13 +47,21 @@ cat > "$APP_DIR/Contents/Info.plist" <<'PLIST'
   <key>CFBundleDisplayName</key><string>CZ</string>
   <key>CFBundleIdentifier</key><string>local.cz.studio</string>
   <key>CFBundleExecutable</key><string>CZ</string>
+  <key>CFBundleIconFile</key><string>CZ</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleVersion</key><string>1.0</string>
+  <key>CFBundleVersion</key><string>2.0</string>
+  <key>CFBundleShortVersionString</key><string>2.0</string>
+  <key>LSMinimumSystemVersion</key><string>13.0</string>
+  <key>NSHighResolutionCapable</key><true/>
 </dict>
 </plist>
 PLIST
 
+# Finder soll das neue Symbol sofort anzeigen.
+touch "$APP_DIR" 2>/dev/null || true
+
 echo ""
 echo "Fertig. Du findest CZ jetzt unter Programme im Ordner ~/Applications."
+echo "Doppelklick auf CZ öffnet dein CZ Studio im eigenen Fenster."
 echo "Tipp: CZ ins Dock ziehen, dann reicht ein Klick."
 open "$HOME/Applications" || true

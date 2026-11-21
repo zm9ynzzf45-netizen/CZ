@@ -25,6 +25,8 @@ dependencies = [
     "faster-whisper==1.1.0",
     # 与 requirements.txt 保持一致：PyAV 19 移除了 Whisper 使用的参数。
     "av<19",
+    # Native CZ window on macOS (scripts/mac/cz_desktop.py).
+    "pywebview>=5.4; sys_platform == 'darwin'",
     "toml==0.10.2",
     "imageio-ffmpeg==0.6.0",
     "loguru==0.7.3",
