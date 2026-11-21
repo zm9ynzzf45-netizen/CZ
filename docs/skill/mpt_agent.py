@@ -33,6 +33,7 @@ SUPPORTED_SOURCES = {
     "coverr",
     "aigei",
     "wavespeed",
+    "higgsfield",
     "volcengine_seedance",
     "ofox",
     "metaso_minimax",
@@ -489,6 +490,17 @@ def missing_config(config_path: Path, cli_args: list[str]) -> tuple[str, list[st
             missing.append("wavespeed_api_keys")
         if not has_cli_option(cli_args, "--confirm-wavespeed-charge"):
             missing.append("confirm_wavespeed_charge")
+    elif source == "higgsfield":
+        # Same credential order as the runtime: config key first, then the
+        # official SDK environment variables. Every clip is billed.
+        if not (
+            _has_configured_value(_plain_config_value(text, "higgsfield_api_keys"))
+            or os.environ.get("HF_KEY")
+            or (os.environ.get("HF_API_KEY") and os.environ.get("HF_API_SECRET"))
+        ):
+            missing.append("higgsfield_api_keys")
+        if not has_cli_option(cli_args, "--confirm-higgsfield-charge"):
+            missing.append("confirm_higgsfield_charge")
     elif source == "ofox":
         # 与运行时 Provider 保持完全一致的凭据优先级：配置键优先，其次是
         # 语义明确的 OFOX_API_KEY 环境变量。
@@ -636,6 +648,10 @@ def report_missing_config(provider: str, missing: list[str]) -> int:
         print("SEEDANCE_CHARGE_CONFIRMATION_REQUIRED=--confirm-seedance-charge")
     if "confirm_wavespeed_charge" in missing:
         print("WAVESPEED_CHARGE_CONFIRMATION_REQUIRED=--confirm-wavespeed-charge")
+    if "higgsfield_api_keys" in missing:
+        print("HIGGSFIELD_API_KEY_URL=https://console.higgsfield.ai")
+    if "confirm_higgsfield_charge" in missing:
+        print("HIGGSFIELD_CHARGE_CONFIRMATION_REQUIRED=--confirm-higgsfield-charge")
     if "aigei_api_key" in missing:
         print("AIGEI_API_KEY_URL=https://www.aigei.com/open/console/apikey")
     if "confirm_aigei_charge" in missing:

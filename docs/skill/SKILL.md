@@ -127,6 +127,11 @@ generated WaveSpeed clip is billed per request by WaveSpeed. Only after the user
 explicitly confirms, rerun with `--confirm-wavespeed-charge`; never add this
 flag silently.
 
+When `HIGGSFIELD_CHARGE_CONFIRMATION_REQUIRED` is present, explain that every
+generated Higgsfield clip is billed from the Higgsfield API balance. Only after
+the user explicitly confirms, rerun with `--confirm-higgsfield-charge`; never add
+this flag silently.
+
 When `OFOX_CHARGE_CONFIRMATION_REQUIRED` is present, explain that every
 generated OFox clip creates a paid task. Only after the user explicitly
 confirms, rerun with `--confirm-ofox-charge`; never add this flag silently.
