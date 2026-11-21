@@ -330,8 +330,8 @@ TREND_COUNT = 10
 def build_trend_prompt(niche: str, platform: str) -> str:
     return f"""Du bist Social-Media-Analyst für Kurzvideos auf TikTok und Instagram Reels.
 
-Erstelle eine Auswertung der {TREND_COUNT} stärksten aktuellen Kurzvideo-Trendformate,
-die sich für die Nische "{niche or 'allgemein / Comedy'}" eignen (Fokus: {platform or 'TikTok und Instagram Reels'}).
+Erstelle eine Auswertung der {TREND_COUNT} stärksten aktuellen Kurzvideo-Trendformate
+{f'für die Nische "{niche}"' if niche else "über alle Nischen hinweg"} (Fokus: {platform or 'TikTok und Instagram Reels'}).
 Stütze dich auf dein Wissen über wiederkehrende virale Formate. Erfinde keine konkreten
 Aufrufzahlen, Accounts oder Links.
 
@@ -345,14 +345,15 @@ Für jeden Trend:
 - "hook": was in Sekunde 0-2 passiert
 - "format": Aufbau/Schnitt in Stichpunkten, ein Satz
 - "sound": passende Sound-/Musik-Art
+- "niches": 2-4 Nischen, in denen das Format besonders gut läuft (kommagetrennt)
 - "prompt": englischer Video-Prompt für Clip 1 (vertical 9:16, max. 600 Zeichen,
   endet mit "No text, no logos, no watermark.")
 
 Sortiere nach score absteigend. Antworte NUR mit gültigem JSON:
-{{"items":[{{"name":"","platform":"","status":"","score":8,"desc":"","why":"","hook":"","format":"","sound":"","prompt":""}}]}}"""
+{{"items":[{{"name":"","platform":"","status":"","score":8,"desc":"","why":"","hook":"","format":"","sound":"","niches":"","prompt":""}}]}}"""
 
 
-TREND_FIELDS = ("name", "platform", "status", "desc", "why", "hook", "format", "sound", "prompt")
+TREND_FIELDS = ("name", "platform", "status", "desc", "why", "hook", "format", "sound", "niches", "prompt")
 
 
 def parse_trends(text: str) -> list[dict]:
@@ -385,7 +386,7 @@ def generate_trends(niche: str, platform: str = "") -> dict:
     data = {
         "items": items,
         "updated": datetime.datetime.now().strftime("%d.%m.%Y %H:%M"),
-        "niche": str(niche)[:80],
+        "niche": str(niche)[:80] or "alle Nischen",
         "source": "KI-Einschätzung",
     }
     with _lock:

@@ -101,7 +101,9 @@ button,input,select,textarea{font:inherit;color:inherit}
 .seg .hook{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,var(--mg),rgba(255,43,214,.3))}
 .seg span{position:relative;background:var(--panel2);padding:0 4px;border-radius:2px}
 .scale{display:flex;justify-content:space-between;font-size:11px;color:var(--dim)}
-input[type=range]{width:100%;accent-color:var(--cy);margin-top:6px}
+input[type=range]{width:100%;accent-color:var(--cy);margin-top:10px;-webkit-appearance:none;appearance:none;height:6px;border-radius:3px;background:linear-gradient(90deg,var(--cy) var(--fill,20%),var(--line2) var(--fill,20%))}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:18px;height:18px;border-radius:50%;background:var(--cy);box-shadow:0 0 12px var(--cy);cursor:pointer;border:0}
+input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:var(--cy);border:0}
 
 /* form */
 .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 16px}
@@ -109,6 +111,7 @@ input[type=range]{width:100%;accent-color:var(--cy);margin-top:6px}
 .f{display:grid;gap:6px}
 .f>span{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--soft)}
 .f>span em{font-style:normal;text-transform:none;letter-spacing:0;color:var(--dim)}
+select{-webkit-appearance:none;appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--cy) 50%),linear-gradient(135deg,var(--cy) 50%,transparent 50%)!important;background-position:calc(100% - 16px) 50%,calc(100% - 11px) 50%!important;background-size:5px 5px!important;background-repeat:no-repeat!important;padding-right:30px!important}
 input[type=text],input[type=password],select,textarea{width:100%;background:#03050a;border:1px solid var(--line2);border-radius:4px;padding:10px 12px;color:var(--ink)}
 textarea{min-height:80px;resize:vertical;line-height:1.5}
 input::placeholder,textarea::placeholder{color:var(--dim)}
@@ -166,9 +169,8 @@ a{color:var(--cy)}
 .tag.up{color:var(--ok);border-color:rgba(57,255,156,.4)}
 .tag.new{color:var(--mg);border-color:rgba(255,43,214,.4)}
 .trendbar{display:grid;gap:8px;margin-bottom:10px}
-.trendbar .row{display:flex;gap:6px}
-.trendbar select{padding:7px 8px;font-size:12px}
-.mini{min-height:34px;padding:4px 10px;border-radius:4px;border:1px solid var(--cy);background:var(--cy-soft);color:var(--cy);cursor:pointer;font-size:12px;letter-spacing:.06em;white-space:nowrap}
+.trendbar select{padding:8px 10px;font-size:12px}
+.mini{width:100%;min-height:36px;padding:6px 10px;border-radius:4px;border:1px solid var(--cy);background:var(--cy-soft);color:var(--cy);cursor:pointer;font-size:12px;letter-spacing:.06em;white-space:nowrap}
 .mini:disabled{opacity:.5;cursor:progress}
 .src{font-size:11px;color:var(--amb)}
 .detail{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
@@ -206,8 +208,8 @@ a{color:var(--cy)}
     <section>
       <div class="hd"><span>trend.radar</span><small id="tstand">lädt …</small></div>
       <div class="trendbar">
-        <div class="row"><select id="tplat" aria-label="Plattform für die Trend-Auswertung"><option value="TikTok und Instagram Reels">TikTok + Instagram</option><option value="TikTok">TikTok</option><option value="Instagram Reels">Instagram</option></select>
-        <button class="mini" type="button" id="analyzeBtn">⟲ Top 10 auswerten</button></div>
+        <select id="tplat" aria-label="Plattform für die Trend-Auswertung"><option value="TikTok und Instagram Reels">TikTok + Instagram</option><option value="TikTok">TikTok</option><option value="Instagram Reels">Instagram</option></select>
+        <button class="mini" type="button" id="analyzeBtn">⟲ Top 10 auswerten</button>
         <div class="src" id="tsrc"></div>
       </div>
       <div id="trends"></div>
@@ -338,6 +340,7 @@ function parts(){ const L = +$('len').value, c = S.clip, n = Math.max(1, Math.ce
 function drawTimeline(){
   const L = +$('len').value, p = parts();
   $('lenbig').textContent = L; $('lenend').textContent = L + 's';
+  $('len').style.setProperty('--fill', ((L - 5) / 55 * 100).toFixed(1) + '%');
   $('clips').textContent = p.length === 1 ? '1 Clip' : p.length + ' Clips à ' + S.clip + 's';
   $('tl').innerHTML = p.map((s,i) => `<div class="seg" style="flex:${s} 1 0;--tick:${(5/s*100).toFixed(2)}%">${i===0?`<i class="hook" style="width:${(2/s*100).toFixed(1)}%"></i>`:''}<span>${p.length>6?'#'+(i+1):'clip_'+(i+1)}</span></div>`).join('');
   $('presets').innerHTML = '<label>LÄNGE</label>' + [10,15,30,60].map(v => `<button type="button" class="chip" data-v="${v}" aria-pressed="${v===L}">${v}s</button>`).join('');
@@ -356,7 +359,7 @@ function renderTrends(){
 }
 function showTrendMeta(d){
   $('tstand').textContent = d.examples ? 'Beispiele' : (d.updated || 'gespeichert');
-  $('tsrc').textContent = d.source ? `${d.source} für „${d.niche || 'allgemein'}“ · keine Live-Daten von TikTok/Instagram` : 'Noch keine Auswertung. Nische eintragen, dann „Top 10 auswerten“.';
+  $('tsrc').textContent = d.source ? `${d.source} · ${d.niche || 'alle Nischen'} · keine Live-Daten von TikTok/Instagram` : 'Klick „Top 10 auswerten“. Nische ist optional: leer = Trends aus allen Nischen.';
 }
 async function loadTrends(){
   try { const d = await call('/cz/trends'); S.trends = d.items || []; showTrendMeta(d); }
@@ -365,7 +368,6 @@ async function loadTrends(){
 }
 async function analyzeTrends(){
   const niche = $('niche').value.trim();
-  if (!niche) { setStatus('status', 'Für die Trend-Auswertung zuerst eine Nische eintragen.', true); $('niche').focus(); return; }
   if (S.status && !S.status.llm_ready) { setStatus('status', 'Text-KI fehlt: oben rechts ⚙ SETUP öffnen und Schlüssel eintragen.', true); return; }
   $('analyzeBtn').disabled = true; $('analyzeBtn').textContent = '⟲ analysiere …';
   try { const d = await call('/cz/trends/analyze', {method:'POST', body: JSON.stringify({niche, platform:$('tplat').value})});
@@ -379,9 +381,9 @@ function showTrendDetail(i){
   $('tdMeta').innerHTML = `${esc(t.platform||'')} ${statusTag(t)} ${scoreBar(t.score)}`;
   const f = (h, v, full) => v ? `<div class="fact${full?' full':''}"><h3>${h}</h3><p>${esc(v)}</p></div>` : '';
   $('trendDetail').innerHTML = `<div class="full"><h2>${esc(t.name)}</h2><p class="hint">${esc(t.desc||'')}</p></div>`
-    + f('warum es funktioniert', t.why, true) + f('hook · 0–2s', t.hook) + f('aufbau', t.format) + f('sound', t.sound)
+    + f('warum es funktioniert', t.why, true) + f('hook · 0–2s', t.hook) + f('aufbau', t.format) + f('sound', t.sound) + f('passt zu nischen', t.niches)
     + (t.prompt ? `<article class="term full"><header><b>trend.prompt</b><span>Beispiel für Clip 1</span></header><textarea readonly>${esc(t.prompt)}</textarea></article>` : '')
-    + `<div class="full hint">Ist als Vorlage gewählt. Trag unten deine Details ein (z. B. „2 Katzen, albanische Herkunft“), CZ baut den Rest im Stil des Trends.</div>`;
+    + `<div class="full hint">Ist als Vorlage gewählt. Trag unten deine Nische und Details ein (z. B. „2 Katzen, albanische Herkunft“), CZ baut den Rest im Stil des Trends.</div>`;
 }
 async function loadProjects(){
   try {

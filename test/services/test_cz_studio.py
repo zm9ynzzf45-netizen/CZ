@@ -102,6 +102,10 @@ class CzStudioTest(unittest.TestCase):
         for part in ("Trend-Hook: H1", "Trend-Aufbau: F1", "Trend-Beispielprompt: P1"):
             self.assertIn(part, prompt)
 
+    def test_trend_prompt_works_without_niche(self):
+        self.assertIn("über alle Nischen hinweg", cz.build_trend_prompt("", "TikTok"))
+        self.assertIn('für die Nische "Katzen"', cz.build_trend_prompt("Katzen", "TikTok"))
+
     def test_parse_trends_sorts_clamps_and_limits(self):
         items = [{"name": f"T{i}", "score": i} for i in range(15)] + [{"name": ""}, {"name": "X", "score": "x"}]
         trends = cz.parse_trends("vorweg " + json.dumps({"items": items}))
